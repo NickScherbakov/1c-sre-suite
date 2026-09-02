@@ -1,4 +1,4 @@
-[![Infostart](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)](https://infostart.ru/public/2778482/)
+[![Infostart](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)](https://infostart.ru/public/2779597/)
 
 # DevOps & Stability Enterprise Suite for 1C on Linux
 
