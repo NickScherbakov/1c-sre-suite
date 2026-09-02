@@ -1,0 +1,53 @@
+﻿stages:
+  - test
+  - deploy
+  - smoke-test
+
+variables:
+  DB_CONNECTION: "/F"/var/lib/gitlab-runner/builds/1c-db""
+  EXT_NAME: "MyCustomExtension"
+  DB_USER: "Admin"
+  DB_PASS: "SecurePassword123"
+  APP_URL: "http://127.0.0.1/my-base"
+
+# РЁР°Рі 1: РўРµСЃС‚РёСЂРѕРІР°РЅРёРµ Рё Р·Р°РїСѓСЃРє СЃРєСЂРёРїС‚Р° СЃРёРЅС‚Р°РєСЃРёС‡РµСЃРєРѕРіРѕ РєРѕРЅС‚СЂРѕР»СЏ СЃ 5 СЃР»РѕСЏРјРё Р·Р°С‰РёС‚С‹
+run-syntax-check:
+  stage: test
+  tags:
+    - 1c-linux-runner
+  before_script:
+    - chmod +x ./scripts/1c-ci-linux-build-v4.sh
+  script:
+    - ./scripts/1c-ci-linux-build-v4.sh -c "$DB_CONNECTION" -e "$EXT_NAME" -u "$DB_USER" -w "$DB_PASS" -s "./src/extension"
+  artifacts:
+    when: always
+    paths:
+      - /tmp/1c_log_*.txt
+      - /tmp/1c_err_*.txt
+    expire_in: 1 week
+
+# РЁР°Рі 2: Р‘РµР·РѕРїР°СЃРЅР°СЏ РЅР°РєР°С‚РєР° РёР·РјРµРЅРµРЅРёР№ (Deployment)
+deploy-to-stage:
+  stage: deploy
+  only:
+    - main
+  tags:
+    - 1c-linux-runner
+  script:
+    - echo "[*] РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅС‹Р№ СЃР±СЂРѕСЃ Р°РєС‚РёРІРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёС… СЃРѕРµРґРёРЅРµРЅРёР№..."
+    - /opt/1cv8/x86_64/current/rac session --cluster=$(/opt/1cv8/x86_64/current/rac cluster list | grep cluster | head -n1 | awk '{print $3}') terminate --base=my-base || true
+    - echo "[*] РњРѕРЅРѕРїРѕР»СЊРЅРѕРµ РїСЂРёРјРµРЅРµРЅРёРµ РєРѕРЅС„РёРіСѓСЂР°С†РёРё Р±Р°Р·С‹ РґР°РЅРЅС‹С…..."
+    - xvfb-run -a /opt/1cv8/x86_64/current/1cv8 DESIGNER $DB_CONNECTION /N "$DB_USER" /P "$DB_PASS" /UpdateDBCfg /Force
+  dependencies:
+    - run-syntax-check
+
+# РЁР°Рі 3: Р’РµСЂРёС„РёРєР°С†РёСЏ СЂР°Р±РѕС‚РѕСЃРїРѕСЃРѕР±РЅРѕСЃС‚Рё СЃРµСЂРІРёСЃР° (Smoke-С‚РµСЃС‚ С‡РµСЂРµР· curl)
+run-smoke-test:
+  stage: smoke-test
+  only:
+    - main
+  tags:
+    - 1c-linux-runner
+  script:
+    - echo "[*] РџСЂРѕРІРµСЂСЏРµРј РґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ РІРµР±-РёРЅС‚РµСЂС„РµР№СЃР° С‡РµСЂРµР· curl..."
+    - curl -s -f -I -H "Accept: text/html" "$APP_URL/ru_RU/" | grep "200 OK"

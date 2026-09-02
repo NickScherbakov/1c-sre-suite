@@ -1,0 +1,61 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns="http://v8.1c.ru/v8/tech-log">
+  <!-- РЎРѕР·РґР°РЅРёРµ РјРёРЅРёРґР°РјРїРѕРІ РїСЂРё Р°РІР°СЂРёР№РЅС‹С… Р·Р°РІРµСЂС€РµРЅРёСЏС… -->
+  <dump create="true" location="/var/1c/dumps" type="3" prntscr="false"/>
+  
+  <!-- Р—Р°РїРёСЃСЊ РўР– СЃ РіР»СѓР±РѕРєРѕР№ РёСЃС‚РѕСЂРёРµР№ СЂРѕС‚Р°С†РёРё (48 С‡Р°СЃРѕРІ) -->
+  <log location="/var/log/1c_tech_log" history="48">
+    <!-- РЎР»РѕР№ 1: РўСЏР¶РµР»С‹Рµ СЃРµСЂРІРµСЂРЅС‹Рµ РІС‹Р·РѕРІС‹ CALL/SCALL > 100 РњР‘ -->
+    <event>
+      <eq property="Name" value="CALL"/>
+      <gt property="Memory" value="104857600"/>
+    </event>
+    <event>
+      <eq property="Name" value="SCALL"/>
+      <gt property="Memory" value="104857600"/>
+    </event>
+    
+    <!-- РЎР»РѕР№ 2: РўСЏР¶РµР»С‹Рµ Р·Р°РїСЂРѕСЃС‹ PostgreSQL > 50 РњР‘ РёР»Рё > 5 СЃРµРєСѓРЅРґ -->
+    <event>
+      <eq property="Name" value="DBPOSTGRS"/>
+      <gt property="Memory" value="52428800"/>
+    </event>
+    <event>
+      <eq property="Name" value="DBPOSTGRS"/>
+      <gt property="Duration" value="5000000"/>
+    </event>
+    
+    <!-- РЎР»РѕР№ 3: РЈРїСЂР°РІР»РµРЅРёРµ Р±Р»РѕРєРёСЂРѕРІРєР°РјРё РЎРЈР‘Р” (TLOCK/TDEADLOCK) -->
+    <event>
+      <eq property="Name" value="TLOCK"/>
+      <gt property="WaitConnections" value="0"/>
+    </event>
+    <event>
+      <eq property="Name" value="TDEADLOCK"/>
+    </event>
+    
+    <!-- РЎР»РѕР№ 4: РЎРёСЃС‚РµРјРЅС‹Рµ СЃР±РѕРё Рё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅС‹Рµ РѕС‚РєР»СЋС‡РµРЅРёСЏ (EXCP/ATTN) -->
+    <event>
+      <eq property="Name" value="EXCP"/>
+    </event>
+    <event>
+      <eq property="Name" value="ATTN"/>
+    </event>
+    
+    <!-- РЎРїРµС†РёС„РёРєР°С†РёСЏ РІС‹РіСЂСѓР¶Р°РµРјС‹С… СЃРІРѕР№СЃС‚РІ РґР»СЏ СЃРєРІРѕР·РЅРѕРіРѕ СЂР°СЃСЃР»РµРґРѕРІР°РЅРёСЏ -->
+    <properties>
+      <property name="p:processName"/>
+      <property name="t:connectID"/>
+      <property name="SessionID"/>
+      <property name="Usr"/>
+      <property name="Memory"/>
+      <property name="MemoryPeak"/>
+      <property name="Duration"/>
+      <property name="Context"/>
+      <property name="Sql"/>
+      <property name="WaitConnections"/>
+      <property name="Exception"/>
+      <property name="Descr"/>
+    </properties>
+  </log>
+</config>

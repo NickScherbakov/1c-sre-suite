@@ -1,0 +1,24 @@
+﻿# 1C РІСЂРµРјРµРЅРЅС‹Рµ С„Р°Р№Р»С‹ Рё Р±Р»РѕРєРёСЂРѕРІРєРё
+*.1cLck
+*.1cws
+1Cv8.lk
+1Cv8.log
+1Cv8.tmp
+1Cv8Tmp*
+~*
+
+# Р›РѕРіРё Рё РґР°РјРїС‹
+*.log
+*.mdmp
+*.dmp
+/tmp/1c_*
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# РЎРїРµС†РёС„РёС‡РЅРѕРµ РґР»СЏ EDT
+.metadata/
+.bin/
+/build/
+bin/
