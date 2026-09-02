@@ -15,7 +15,7 @@
       Декларативный подход Infrastructure as Code (IaC), превентивный Self-Healing, 5 рубежей обороны от False Success и старт разработки автономных ИИ-агентов для экосистемы «1С:Предприятие 8».
     </p>
     <p style="font-size: 13px; color: #586069; margin: 0;">
-      <strong>Публичный релиз стека инструментов: автоматизация сборки EDT ⇄ Конфигуратор, мягкая ротация rphost, безопасный logcfg.xml и запуск ИИ-дежурного на базе MCP</strong>
+      <strong>Публичный релиз стека инструментов: автоматизация сборки EDT &#8644; Конфигуратор, мягкая ротация rphost, безопасный logcfg.xml и запуск ИИ-дежурного на базе MCP</strong>
     </p>
   </div>
 
@@ -61,18 +61,18 @@
     </div>
     <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
       <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 11pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;">1c-sre-suite/
-├── scripts/
-│   ├── 1c-ci-linux-build-v4.sh    # Детерминированный сборочный конвейер с 5 рубежами защиты
-│   └── edt-to-configurator.js     # CLI-мост трансляции проектов EDT ⇄ бинарный .cfe / .cf
-├── orchestrator/
-│   ├── admincluster_run.sh        # Внешний менеджер мягкой ротации rphost через RAS API
-│   ├── admincluster-monitor@.service # systemd unit фоновой оркестрации
-│   └── admincluster-monitor@.timer   # Регламентные триггеры выявления процессов-перестарков
-├── config/
-│   ├── logcfg.xml                 # Оптимизированный профиль ТЖ без деградации диска
-│   └── nethasp.ini                # Конфигурация HASP без broadcast-задержек в сети
-└── docker/
-    └── Dockerfile                 # Headless-образ сборочного раннера (Ubuntu + Xvfb + Fonts)</pre>
+&#9500;&#9472;&#9472; scripts/
+&#9474;   &#9500;&#9472;&#9472; 1c-ci-linux-build-v4.sh    # Детерминированный сборочный конвейер с 5 рубежами защиты
+&#9474;   &#9492;&#9472;&#9472; edt-to-configurator.js     # CLI-мост трансляции проектов EDT &#8644; бинарный .cfe / .cf
+&#9500;&#9472;&#9472; orchestrator/
+&#9474;   &#9500;&#9472;&#9472; admincluster_run.sh        # Внешний менеджер мягкой ротации rphost через RAS API
+&#9474;   &#9500;&#9472;&#9472; admincluster-monitor@.service # systemd unit фоновой оркестрации
+&#9474;   &#9492;&#9472;&#9472; admincluster-monitor@.timer   # Регламентные триггеры выявления процессов-перестарков
+&#9500;&#9472;&#9472; config/
+&#9474;   &#9500;&#9472;&#9472; logcfg.xml                 # Оптимизированный профиль ТЖ без деградации диска
+&#9474;   &#9492;&#9472;&#9472; nethasp.ini                # Конфигурация HASP без broadcast-задержек в сети
+&#9492;&#9472;&#9472; docker/
+    &#9492;&#9472;&#9472; Dockerfile                 # Headless-образ сборочного раннера (Ubuntu + Xvfb + Fonts)</pre>
     </div>
   </div>
 
