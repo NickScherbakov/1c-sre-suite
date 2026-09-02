@@ -1,0 +1,277 @@
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e;">
+
+  <!-- Вводный блок / Заголовок статьи -->
+  <div style="background: #f6f8fa; border-left: 5px solid #0366d6; padding: 16px 20px; margin-bottom: 24px; border-radius: 0 6px 6px 0;">
+    <h2 style="margin: 0 0 10px 0; color: #0366d6; font-size: 22px; border: none; padding: 0;">1C:SRE-Suite: переводим управление инфраструктурой 1С на Linux в декларативный формат. Приглашаем в Open Source проект</h2>
+    <p style="font-size: 15px; color: #444d56; margin: 0 0 8px 0; font-weight: 500;">
+      Декларативный подход Infrastructure as Code (IaC), превентивный Self-Healing, 5 рубежей обороны от False Success и старт разработки автономных ИИ-агентов для экосистемы «1С:Предприятие 8».
+    </p>
+    <p style="font-size: 13px; color: #586069; margin: 0;">
+      <strong>Публичный релиз стека инструментов: автоматизация сборки EDT ⇄ Конфигуратор, мягкая ротация rphost, безопасный logcfg.xml и запуск ИИ-дежурного на базе MCP</strong>
+    </p>
+  </div>
+
+  <p>
+    Сопровождение крупномасштабных систем на платформе «1С:Предприятие» в Linux-окружении традиционно страдает от реактивного подхода и ручного вмешательства. Администрирование через графические утилиты и проведение обновлений во внерабочее время приводят к неизбежному дрейфу конфигураций на серверах одного кластера. В результате среднее время локализации сбоев (MTTR) растет, делая недостижимой плановую доступность систем на уровне 99,9%.
+  </p>
+
+  <div style="background-color: #fffbdd; border: 1px solid #d9d099; border-left: 4px solid #e36209; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0;">
+    <strong style="color: #9e4100;">Математика доступности (SLA 99,9%):</strong> При целевой доступности «три девятки» годовой бюджет ошибок (Error Budget) жестко лимитирует суммарный незапланированный простой информационной базы величиной <strong>не более 525 минут в год</strong>. Любой затянувшийся ручной траблшутинг или аварийное падение рабочего процесса rphost мгновенно сжигает квартальный запас надежности сервиса.
+  </div>
+
+  <p>
+    Для стабилизации показателей надежности необходим переход к концепции <strong>Infrastructure as Code (IaC)</strong>, когда все настройки, сборочные скрипты и параметры сред описываются декларативно и хранятся в системе контроля версий.
+  </p>
+  <p>
+    С этой целью мы запустили открытый проект <strong>1C:SRE-Suite (DevOps & Stability Enterprise Suite for 1C on Linux)</strong>. Мы выложили в публичный доступ проверенный набор инструментов, призванный заменить интуитивную настройку строгими воспроизводимыми регламентами. Исходный код проекта доступен на GitHub: <a href="https://github.com/NickScherbakov/1c-sre-suite" target="_blank" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;">NickScherbakov/1c-sre-suite</a>.
+  </p>
+
+  <!-- Оглавление -->
+  <div style="background: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 14px 18px; margin: 20px 0;">
+    <strong style="display: block; margin-bottom: 8px; color: #24292e; font-size: 14px;">Оглавление:</strong>
+    <ol style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14px; color: #0366d6;">
+      <li><a href="#architecture" style="color: #0366d6; text-decoration: none;">Архитектурное наполнение SRE-пакета</a></li>
+      <li><a href="#ci-build" style="color: #0366d6; text-decoration: none;">Гарантированный синтаксический контроль: 1c-ci-linux-build-v4.sh</a></li>
+      <li><a href="#edt-import" style="color: #0366d6; text-decoration: none;">Бесшовный импорт проектов: edt-to-configurator.js</a></li>
+      <li><a href="#self-healing" style="color: #0366d6; text-decoration: none;">Превентивная ротация и Self-Healing: папка orchestrator</a></li>
+      <li><a href="#env-config" style="color: #0366d6; text-decoration: none;">Безопасные настройки среды: папка config</a></li>
+      <li><a href="#ai-sre-agents" style="color: #0366d6; text-decoration: none;">Главный вектор: разработка автономных ИИ-SRE агентов (AIOps)</a></li>
+      <li><a href="#community-roadmap" style="color: #0366d6; text-decoration: none;">Как принять участие в Open Source проекте?</a></li>
+    </ol>
+  </div>
+
+  <!-- Раздел 1 -->
+  <h2 id="architecture" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">📂 Архитектурное наполнение SRE-пакета</h2>
+  <p>
+    В репозитории уже опубликован готовый технологический стек, закрывающий ключевые задачи автоматизации сборки, сетевого лицензирования и упреждающего контроля стабильности серверов 1С в среде Linux:
+  </p>
+
+  <!-- Карточка структуры пакета -->
+  <div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+    <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+      <span>Структура репозитория — NickScherbakov/1c-sre-suite</span><span style="color: #718096; font-weight: normal; font-size: 9pt;">Tree</span>
+    </div>
+    <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+      <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 11pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;">1c-sre-suite/
+├── scripts/
+│   ├── 1c-ci-linux-build-v4.sh    # Детерминированный сборочный конвейер с 5 рубежами защиты
+│   └── edt-to-configurator.js     # CLI-мост трансляции проектов EDT ⇄ бинарный .cfe / .cf
+├── orchestrator/
+│   ├── admincluster_run.sh        # Внешний менеджер мягкой ротации rphost через RAS API
+│   ├── admincluster-monitor@.service # systemd unit фоновой оркестрации
+│   └── admincluster-monitor@.timer   # Регламентные триггеры выявления процессов-перестарков
+├── config/
+│   ├── logcfg.xml                 # Оптимизированный профиль ТЖ без деградации диска
+│   └── nethasp.ini                # Конфигурация HASP без broadcast-задержек в сети
+└── docker/
+    └── Dockerfile                 # Headless-образ сборочного раннера (Ubuntu + Xvfb + Fonts)</pre>
+    </div>
+  </div>
+
+  <!-- Раздел 2 -->
+  <h2 id="ci-build" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">1. Гарантированный синтаксический контроль: scripts/1c-ci-linux-build-v4.sh</h2>
+  <p>
+    Пакетный запуск Конфигуратора 1С на Linux имеет крайне опасную особенность: при возникновении критических ошибок или проблем с сетевыми лицензиями утилита <code>DESIGNER</code> способна завершить выполнение с успешным кодом возврата операционной системы <code>0</code>. Механизм динамической компиляции скрывает дефекты вплоть до выполнения кода реальными пользователями.
+  </p>
+  <p>
+    Наш сборочный скрипт исключает попадание дефектного кода в рабочую среду с помощью <strong>пяти оборонительных слоев</strong>:
+  </p>
+
+  <!-- Таблица 5 рубежей -->
+  <table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+    <thead>
+      <tr style="background-color: #f6f8fa;">
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 24%; text-align: left; color: #1f2328;">Рубеж защиты</th>
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 38%; text-align: left; color: #1f2328;">Скрытая угроза в Linux</th>
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 38%; text-align: left; color: #1f2328;">Инженерное решение SRE-Suite</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Слой 1: Нормализация логов и BOM</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Платформа пишет лог в UTF-16LE или UTF-8 с BOM. Стандартный <code>grep</code> в Linux UTF-8 окружении пропускает строки ошибок.</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Определение MIME-кодировки утилитой <code>file</code>, конвертация через <code>iconv</code> в UTF-8 и удаление байтов BOM: <code>sed -i '1s/^\xEF\xBB\xBF//'</code>.</td>
+      </tr>
+      <tr style="background-color: #fcfcfc;">
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Слой 2: Проверка целостности отчета</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">«Тихое» падение ядра платформы на старте создает пустой файл отчета, который парсеры трактуют как «ошибок нет».</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Физическая проверка заполнения лога <code>[[ -s "$LOG_FILE" ]]</code> перед парсингом. Пустой лог немедленно валит пайплайн.</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Слой 3: Мультиязычный POSIX-парсер</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">В зависимости от локали контейнера сообщения выводятся на русском или английском (<code>Error</code>, <code>Undefined</code>, <code>Expected</code>).</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Универсальный расширенный regex-шаблон, охватывающий терминологию ошибок компилятора обеих локалей платформы.</td>
+      </tr>
+      <tr style="background-color: #fcfcfc;">
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Слой 4: Изоляция процессов и lock-файлов</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Предыдущий прерванный запуск оставляет брошенные файлы блокировок (<code>*.1cLck</code>, <code>1Cv8.lk</code>), блокируя последующие сборки.</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Генерация уникального <code>RUN_ID</code>, проверка активных процессов через <code>pgrep</code> и автоматическая зачистка зависших lock-файлов.</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Слой 5: Сверка метаданных с Git</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Синтаксический контроль пройден, но структура метаданных в собранной БД отличается от исходников в коммите.</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Обратная выгрузка метаданных из СУБД (<code>/DumpConfigToFiles</code>) и побайтовое сравнение <code>diff -r</code> с каталогом Git.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Раздел 3 -->
+  <h2 id="edt-import" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">2. Бесшовный импорт проектов: scripts/edt-to-configurator.js</h2>
+  <p>
+    Современная среда разработки 1C:Enterprise Development Tools (EDT) оперирует структурированным деревом XML-файлов и модулей Eclipse, тогда как боевой сервер исполняет исключительно скомпилированные бинарные контейнеры конфигураций (<code>.cf</code>) и расширений (<code>.cfe</code>).
+  </p>
+  <p>
+    При попытке автоматизировать трансляцию инженеры упираются в ограничения встроенных инструментов: утилита <code>ring</code> только транслирует схему метаданных, а автономный сервер <code>ibcmd</code> требует физического развертывания локальной базы данных.
+  </p>
+
+  <div style="background-color: #f1f8ff; border: 1px solid #c8e1ff; border-left: 4px solid #0366d6; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0;">
+    <strong>Решение SRE-Suite:</strong> Утилита <code>edt-to-configurator.js</code> на базе Node.js берет эту двухэтапную рутину на себя: парсит проект, вычисляет совместимые версии EDT и платформы в системе, инициализирует временную базу данных на быстром диске, импортирует метаданные и отдает готовый бинарный артефакт в CI/CD пайплайн.
+  </div>
+
+  <!-- Раздел 4 -->
+  <h2 id="self-healing" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">3. Превентивная ротация и Self-Healing: папка orchestrator</h2>
+  <p>
+    Утечки оперативной памяти в рабочих процессах <code>rphost</code> на Linux обусловлены их нативной природой (скомпилированные бинарные сборки C++). В среде Linux ядро рассчитывает общий объем потребляемой памяти процесса как сумму физических резидентных страниц (<code>vmRSS</code>) и вытесненного дискового свопа (<code>vmSwap</code>). Игнорирование Swap в мониторинге создает иллюзию «освобождения» памяти, пока система не уходит в глубокий I/O-ступор.
+  </p>
+  <p>
+    На лицензиях уровня ПРОФ встроенные механизмы ограничения памяти платформы <strong>игнорируются</strong>, а жесткий лимит cgroups в Docker приводит к мгновенному обрыву сотен сеансов по <code>SIGKILL</code> от OOM-killer.
+  </p>
+
+  <div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; padding: 14px 18px;">
+    <h3 style="margin: 0 0 10px 0; font-size: 15px; color: #0366d6;">Концепция внешней оркестрации «Перестарков»</h3>
+    <p style="margin: 0 0 8px 0; font-size: 13.5px;">
+      Наш оркестратор на базе RAS API непрерывно анализирует состояние кластера и выявляет процессы-«перестарки»:
+    </p>
+    <ul style="margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.7;">
+      <li>Время жизни процесса превысило регламентный лимит (например, более 24 часов непрерывной работы);</li>
+      <li>Количество активных соединений пользователей опустилось до нуля: <code>Connections == 0</code>;</li>
+      <li>Процесс плавно выводится из эксплуатации и перезапускается без обрыва активных транзакций и сеансов пользователей.</li>
+    </ul>
+    <p style="margin: 8px 0 0 0; font-size: 13px; color: #586069;">
+      Модуль укомплектован production-ready шаблонами служб <code>admincluster-monitor@.service</code> и периодическими таймерами <code>admincluster-monitor@.timer</code> для демона systemd.
+    </p>
+  </div>
+
+  <!-- Раздел 5 -->
+  <h2 id="env-config" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">4. Безопасные настройки среды: папка config</h2>
+  <p>
+    В состав пакета включены выверенные конфигурационные файлы, исключающие деградацию продуктивных серверов:
+  </p>
+  <table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+    <thead>
+      <tr style="background-color: #f6f8fa;">
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 25%; text-align: left; color: #1f2328;">Компонент</th>
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 35%; text-align: left; color: #1f2328;">Назначение артефакта</th>
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 40%; text-align: left; color: #1f2328;">Инженерный эффект</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; font-weight: 600;"><code>config/logcfg.xml</code></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px;">Профиль технологического журнала для точечной фиксации аномалий.</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px;">Фиксирует события <code>CALL/SCALL</code> от 100 МБ памяти, запросы к СУБД <code>DBPOSTGRS</code> свыше 50 МБ или более 5 секунд, и системные исключения <code>EXCP</code>. Защищает диск от переполнения гигабайтами логов.</td>
+      </tr>
+      <tr style="background-color: #fcfcfc;">
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; font-weight: 600;"><code>config/nethasp.ini</code></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px;">Точная сетевая маршрутизация к HASP License Manager.</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px;">Прямое указание IP-адреса сервера лицензий (порт UDP 475) и полное отключение широковещательного broadcast-поиска (<code>NH_USE_BROADCAST = Disabled</code>), устраняющее сетевые таймауты при старте сессий.</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; font-weight: 600;"><code>docker/Dockerfile</code></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px;">Базовый образ сборочного агента на Ubuntu 22.04 LTS.</td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px;">Преднастроенные локали <code>ru_RU.UTF-8</code>, системные шрифты MS Core Fonts, виртуальный фреймбуфер <code>Xvfb</code> и запуск под непривилегированным пользователем для безопасной headless-компиляции.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Раздел 6 -->
+  <h2 id="ai-sre-agents" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🤖 Наш главный вектор: разработка автономных ИИ-SRE агентов</h2>
+  <p>
+    Автоматизация сборок и ротация процессов по жестким статическим правилам — это лишь первая фаза развития проекта. Мы официально объявляем о начале проектирования и разработки <strong>специализированных ИИ-агентских систем для обслуживания инфраструктуры 1С</strong>.
+  </p>
+  <p>
+    В рамках проекта 1C:SRE-Suite мы приступаем к созданию интеллектуальных агентов нового поколения:
+  </p>
+
+  <!-- Блок ИИ-инициатив -->
+  <div style="background-color: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px 20px; margin: 16px 0;">
+    <ul style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14px; color: #24292e;">
+      <li>
+        <strong style="color: #0366d6;">Интеграция по стандарту MCP (Model Context Protocol):</strong> Мы разрабатываем собственный MCP-сервер для 1С, который позволит большим языковым моделям безопасно и напрямую взаимодействовать со структурой метаданных, конфигурационными файлами, кластером серверов и журналом регистрации.
+      </li>
+      <li>
+        <strong style="color: #0366d6;">Интеллектуальный дежурный инженер (AI On-Call):</strong> ИИ-агент подключается к контуру мониторинга, в реальном времени считывает и кластеризует аномалии в технологическом журнале, автоматически сопоставляя пики потребления памяти в процессах <code>rphost</code> с конкретными вызовами и строками кода на BSL.
+      </li>
+      <li>
+        <strong style="color: #0366d6;">Self-Healing на уровне прикладного кода:</strong> Обнаружив утечку памяти, мутабельную коллекцию в кэшируемом модуле или неоптимальную транзакцию, агент самостоятельно генерирует патч исправления кода BSL и создает Pull Request в репозиторий проекта с детальным отчетом.
+      </li>
+    </ul>
+  </div>
+
+  <div style="background-color: #f1f8ff; border: 1px solid #c8e1ff; border-left: 4px solid #0366d6; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0;">
+    Мы планируем сделать эти ИИ-инструменты доступными для всего сообщества. Участие в проекте — это реальная возможность встать у истоков технологий <strong>AIOps в мире «1С:Предприятия»</strong>.
+  </div>
+
+  <!-- Раздел 7 -->
+  <h2 id="community-roadmap" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🤝 Как принять участие в проекте?</h2>
+  <p>
+    Мы стремимся объединить практическую экспертизу архитекторов, разработчиков и SRE/DevOps-инженеров, чтобы создать признанный открытый отраслевой стандарт надежной эксплуатации 1С на Linux.
+  </p>
+  <p>
+    <strong>Приоритетные направления для совместной работы прямо сейчас:</strong>
+  </p>
+
+  <table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+    <thead>
+      <tr style="background-color: #f6f8fa;">
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 28%; text-align: left; color: #1f2328;">Направление</th>
+        <th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 72%; text-align: left; color: #1f2328;">Задачи и технологический стек</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Разработка ИИ-компонентов</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Проектирование навыков для ИИ-агентов (Agent Skills), реализация MCP-инструментов для анализа логов и BSL-кода.</td>
+      </tr>
+      <tr style="background-color: #fcfcfc;">
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Инфраструктурные плейбуки</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Разработка сценариев Ansible для автоматической сборки отказоустойчивых кластеров PostgreSQL под управлением Patroni, etcd и vip-manager.</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Расширение CI/CD-контуров</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Адаптация и тестирование пайплайнов под GitHub Actions, GitLab CI, Jenkins и TeamCity.</td>
+      </tr>
+      <tr style="background-color: #fcfcfc;">
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Автоматизация тестирования</strong></td>
+        <td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Интеграция headless-прогонов сценарных тестов через Vanessa-Automation и модульных тестов YAxUnit в Docker-раннерах.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Призыв к действию и GitHub -->
+  <div style="background-color: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 18px 20px; margin: 20px 0;">
+    <p style="margin: 0 0 10px 0; font-size: 14px; color: #24292e;">
+      Проект поставляется под открытой коммерческой <strong>лицензией MIT</strong>: вы можете свободно использовать его, дорабатывать и внедрять в инфраструктуру своего бизнеса.
+    </p>
+    <p style="margin: 0 0 12px 0;">
+      <a href="https://github.com/NickScherbakov/1c-sre-suite" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0366d6; color: #ffffff; padding: 9px 18px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;">
+        Перейти в репозиторий NickScherbakov/1c-sre-suite на GitHub →
+      </a>
+    </p>
+    <p style="margin: 0; font-size: 13px; color: #586069;">
+      Присоединяйтесь к проекту, тестируйте на своих стендах, делитесь идеями в Issue и присылайте Pull Request'ы!
+    </p>
+  </div>
+
+  <!-- Подвал статьи -->
+  <hr style="border: none; border-top: 1px solid #e1e4e8; margin: 30px 0 20px 0;">
+  <div style="font-size: 13px; color: #586069; background: #fafbfc; border-radius: 6px; padding: 12px 16px;">
+    <p style="margin: 0 0 4px 0;">
+      <em>Материал подготовлен для сообщества DevOps-инженеров, системных администраторов и архитекторов «1С:Предприятия».</em>
+    </p>
+    <p style="margin: 0;">
+      <strong>Николай Щербаков и Соавтор</strong> &mdash; декларативная инфраструктура, SRE и интеллектуальная автоматизация экосистемы 1С на Linux.
+    </p>
+  </div>
+
+</div>
