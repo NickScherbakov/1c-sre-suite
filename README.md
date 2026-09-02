@@ -1,3 +1,5 @@
+[![Infostart](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)](https://infostart.ru/public/2778482/)
+
 # DevOps & Stability Enterprise Suite for 1C on Linux
 
 Флагманский комплекс инструментов для обеспечения надежности, непрерывной интеграции (CI/CD) и проактивной эксплуатации экосистемы «1С:Предприятие 8.3» на платформе Linux.
