@@ -1,0 +1,230 @@
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e;">
+
+<div style="background: #f6f8fa; border-left: 5px solid #0366d6; padding: 16px 20px; margin-bottom: 24px; border-radius: 0 6px 6px 0;">
+<h2 style="margin: 0 0 10px 0; color: #0366d6; font-size: 22px; border: none; padding: 0;">1C:SRE-Suite: автоматизируем непрерывную интеграцию (CI) через GitHub Actions</h2>
+
+<p style="font-size: 15px; color: #444d56; margin: 0 0 8px 0; font-weight: 500;">Декларативный пайплайн в <strong>GitHub Actions</strong>, тонкости лицензирования в Docker (<strong>--net=host</strong>), изоляция <strong>RUN_ID</strong> и интеграция со сборочным конвейером <strong>1C:SRE-Suite</strong>.</p>
+
+<p style="font-size: 13px; color: #586069; margin: 0;"><strong>Часть 2 практического руководства: от первого коммита до детерминированного синтаксического гейта на headless-раннере Linux</strong></p>
+</div>
+
+<p>В первой части нашей публикации мы рассмотрели общую архитектуру SRE-пакета для платформы &laquo;1С:Предприятие&raquo; в операционной системе Linux. Мы заложили теоретический и практический фундамент: описали <strong>пятислойный сборочный скрипт защиты от ложного успеха</strong>, утилиту автоматической трансляции проектов EDT и <strong>превентивные механизмы ротации процессов</strong>.</p>
+
+<div style="background-color: #f1f8ff; border: 1px solid #c8e1ff; border-left: 4px solid #0366d6; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0; font-size: 14px; line-height: 1.6; color: #24292e;">
+<strong>Связь с первой частью цикла:</strong> Архитектурное наполнение SRE-пакета, разбор пяти рубежей обороны скрипта <code>1c-ci-linux-build-v4.sh</code> и методика мягкой ротации <code>rphost</code> опубликованы в вводном материале: <a href="https://infostart.ru/1c/articles/2779597/" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">1C:SRE-Suite: переводим управление инфраструктурой 1С на Linux в декларативный формат (Часть 1)</a>.
+</div>
+
+<p>Однако декларативное описание инфраструктуры работает на полную мощность только тогда, когда оно встроено в <strong>автоматический цикл обратной связи</strong>. Любой коммит разработчика или аналитика должен автоматически проверяться на <strong>синтаксическую корректность до того, как изменения попадут в общую базу</strong>.</p>
+
+<p>Во второй части нашего цикла мы подробно разберем построение <strong>конвейера непрерывной интеграции (CI) на базе GitHub Actions</strong>. Мы покажем внутреннюю структуру конфигурационного файла <code>github-actions-ci.yml</code>, разберем <strong>сетевые нюансы взаимодействия с серверами лицензирования</strong> и покажем, как <strong>изолировать параллельные сессии сборки в контейнерах</strong>. Исходный код проекта и пайплайнов открыт на GitHub: <a href="https://github.com/NickScherbakov/1c-sre-suite" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">NickScherbakov/1c-sre-suite</a>.</p>
+
+<div style="background: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 14px 18px; margin: 20px 0;">
+<strong style="display: block; margin-bottom: 8px; color: #24292e; font-size: 14px;">Оглавление:</strong>
+
+<ol style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14px; color: #0366d6;">
+	<li><a href="#pipeline-steps" style="color: #0366d6; text-decoration: none;">Разбор пайплайна: шаг за шагом</a></li>
+	<li><a href="#engineering-solutions" style="color: #0366d6; text-decoration: none;">Три инженерных решения в основе запуска контейнера</a></li>
+	<li><a href="#community-contribute" style="color: #0366d6; text-decoration: none;">Подключайтесь к развитию проекта</a></li>
+</ol>
+</div>
+
+<h2 id="pipeline-steps" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">📂 Разбор пайплайна: шаг за шагом</h2>
+
+<p>Файл конфигурации <code>github-actions-ci.yml</code> описывает один рабочий процесс (Workflow), который <strong>автоматически активируется при отправке кода (<code>push</code>) или создании запросов на слияние (<code>pull request</code>)</strong> в ветки <code>main</code> и <code>master</code>. Это гарантирует <strong>контроль качества на самых ранних этапах</strong> жизненного цикла разработки.</p>
+
+<table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+	<thead>
+		<tr style="background-color: #f6f8fa;">
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 22%; text-align: left; color: #1f2328;">Этап конвейера</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 38%; text-align: left; color: #1f2328;">Выполняемое действие</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 40%; text-align: left; color: #1f2328;">Технический регламент</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Шаг 1. Исходники Git</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Полное извлечение репозитория с историей коммитов.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><code>actions/checkout@v4</code> с обязательным параметром <strong><code>fetch-depth: 0</code></strong> для Diff-контроля.</td>
+		</tr>
+		<tr style="background-color: #fcfcfc;">
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Шаг 2. Среда Node.js</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Подготовка рантайма для CLI-транслятора EDT.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Развертывание <strong>Node.js v20</strong> и условное выполнение <strong><code>npm ci</code></strong> при наличии манифеста.</td>
+		</tr>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Шаг 3. Сборка раннера</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Динамическая компиляция Docker-образа.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Сборка <strong><code>1c-sre-runner:latest</code></strong> из <code>docker/Dockerfile</code> (Xvfb + системные шрифты).</td>
+		</tr>
+		<tr style="background-color: #fcfcfc;">
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">Шаг 4. Прогон синтаксиса</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Запуск 5 рубежей защиты в изолированном контейнере.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Вызов <code>1c-ci-linux-build-v4.sh</code> с сетевым режимом <strong><code>--net=host</code></strong> и изоляцией <strong><code>RUN_ID</code></strong>.</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 20px 0 8px 0;">Шаг 1. Получение актуальных исходников</h3>
+<p>Конвейер использует стандартный шаг <code>actions/checkout@v4</code>. Важнейшей деталью является параметр <strong><code>fetch-depth: 0</code></strong>. По умолчанию GitHub Actions скачивает только последний коммит, что ускоряет процесс, однако для полноценной работы упреждающего контроля и расчета разницы метаданных (<strong>diff-верификация на пятом слое</strong> нашего сборочного скрипта) <strong>критически необходима полная история изменений</strong>. Указание нулевой глубины извлечения исключает ложные срабатывания.</p>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 20px 0 8px 0;">Шаг 2. Развертывание окружения Node.js</h3>
+<p>Для работы нашего транслятора из формата 1C:EDT в бинарный конфигурационный файл требуется выполнение скрипта <code>scripts/edt-to-configurator.js</code>. Пайплайн разворачивает <strong>виртуальное окружение Node.js 20</strong> и выполняет команду <strong>детерминированной установки зависимостей <code>npm ci</code></strong>, если в корне проекта присутствует файл <code>package.json</code>. Если манифест отсутствует, шаг безопасно пропускается, не прерывая конвейер.</p>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 20px 0 8px 0;">Шаг 3. Динамическая сборка Docker-контейнера</h3>
+<p>Для компиляции кода 1С необходима установленная платформа. Наш конвейер <strong>не требует ручной предустановки платформы на сам GitHub-раннер</strong>. Вместо этого пайплайн собирает воспроизводимый образ сборочного агента <strong><code>1c-sre-runner:latest</code></strong> из <code>docker/Dockerfile</code>. В этот образ уже упакованы все необходимые зависимости: <strong>виртуальный фреймбуфер Xvfb, системные шрифты MS Core Fonts и утилиты администрирования</strong>.</p>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 20px 0 8px 0;">Шаг 4. Запуск тестирования внутри контейнера</h3>
+<p>Это технологически ключевой этап, где одновременно решаются три классические проблемы интеграции 1С в CI-процессы: <strong>сетевая доступность лицензий</strong>, <strong>изоляция параллельных сессий</strong> и <strong>безопасность конфиденциальной информации</strong>.</p>
+
+<p>Команда запуска контейнера выглядит следующим образом:</p>
+
+<div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+    <span>Bash &mdash; Запуск сборочного раннера в изолированном окружении</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">docker run</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+    <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 11pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;"><span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">1</span>docker run --rm \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">2</span>  --net=host \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">3</span>  -v ${{ github.workspace }}:/workspace \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">4</span>  -w /workspace \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">5</span>  -e RUN_ID=&quot;$RUN_ID&quot; \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">6</span>  -e HASP_SERVER_IP=&quot;$HASP_SERVER_IP&quot; \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">7</span>  1c-sre-runner:latest \
+<span style="display: inline-block; width: 22px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">8</span>  bash scripts/1c-ci-linux-build-v4.sh</pre>
+  </div>
+</div>
+
+<div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+    <span>YAML &mdash; Полный рабочий процесс .github/workflows/ci.yml</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Workflow</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+    <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;"><span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 1</span>name: 1C:SRE-Suite CI
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 2</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 3</span>on:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 4</span>  push:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 5</span>    branches: [ main, master ]
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 6</span>  pull_request:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 7</span>    branches: [ main, master ]
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 8</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 9</span>jobs:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">10</span>  syntax-check:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">11</span>    runs-on: ubuntu-latest
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">12</span>    steps:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">13</span>      - name: Шаг 1. Получение актуальных исходников
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">14</span>        uses: actions/checkout@v4
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">15</span>        with:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">16</span>          fetch-depth: 0
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">17</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">18</span>      - name: Шаг 2. Развертывание окружения Node.js
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">19</span>        uses: actions/setup-node@v4
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">20</span>        with:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">21</span>          node-version: 20
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">22</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">23</span>      - name: Установка зависимостей EDT-моста
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">24</span>        run: |
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">25</span>          if [ -f package.json ]; then npm ci; fi
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">26</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">27</span>      - name: Шаг 3. Сборка сборочного Docker-образа
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">28</span>        run: |
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">29</span>          docker build -t 1c-sre-runner:latest ./docker
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">30</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">31</span>      - name: Шаг 4. Запуск тестирования внутри контейнера
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">32</span>        env:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">33</span>          RUN_ID: ${{ github.run_id }}
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">34</span>          HASP_SERVER_IP: ${{ secrets.HASP_SERVER_IP }}
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">35</span>        run: |
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">36</span>          docker run --rm \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">37</span>            --net=host \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">38</span>            -v ${{ github.workspace }}:/workspace \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">39</span>            -w /workspace \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">40</span>            -e RUN_ID=&quot;$RUN_ID&quot; \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">41</span>            -e HASP_SERVER_IP=&quot;$HASP_SERVER_IP&quot; \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">42</span>            1c-sre-runner:latest \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">43</span>            bash scripts/1c-ci-linux-build-v4.sh</pre>
+  </div>
+</div>
+
+<h2 id="engineering-solutions" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🛠️ Три инженерных решения в основе запуска контейнера</h2>
+
+<p>Разберем детально, какие критические инфраструктурные барьеры устраняет приведенная команда запуска раннера.</p>
+
+<table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+	<thead>
+		<tr style="background-color: #f6f8fa;">
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 25%; text-align: left; color: #1f2328;">Инженерный вызов</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 35%; text-align: left; color: #1f2328;">Уязвимость в типовом Docker</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 40%; text-align: left; color: #1f2328;">Решение контура 1C:SRE-Suite</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">1. Сетевые лицензии HASP</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Потеря широковещательных UDP-пакетов в виртуальном мосту (bridge).</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Параметр <strong><code>--net=host</code></strong>: прямой доступ к физическому сетевому стеку.</td>
+		</tr>
+		<tr style="background-color: #fcfcfc;">
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">2. Коллизии параллелизма</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Блокировка общих баз и каталогов несколькими параллельными сборами.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Проброс уникального <strong><code>RUN_ID</code></strong> (на базе <code>github.run_id</code>) для полной изоляции.</td>
+		</tr>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">3. Защита периметра</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Утечка приватных IP-адресов серверов лицензий в открытый репозиторий.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Маскирование через <strong>GitHub Secrets</strong> с генерацией безопасного <code>nethasp.ini</code>.</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 18px 0 8px 0;">1. Сетевой режим host вместо моста (bridge)</h3>
+<p>По умолчанию Docker запускает контейнеры в изолированной виртуальной сети. Для работы платформы &laquo;1С:Предприятие&raquo; внутри контейнера <strong>критически важен доступ к ключам защиты</strong>. Если используются аппаратные HASP-ключи, платформа пытается обнаружить менеджер лицензий по протоколу UDP. В режиме виртуального моста (bridge) <strong>широковещательные UDP-запросы не проходят сквозь сетевой экран Docker</strong>.</p>
+
+<p>Параметр <strong><code>--net=host</code> заставляет контейнер использовать сетевой стек хост-системы</strong>. Это полностью снимает сетевые ограничения: контейнер видит локальную сеть точно так же, как сам GitHub-раннер, что гарантирует <strong>мгновенное получение программных или аппаратных лицензий без сложной маршрутизации</strong>.</p>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 18px 0 8px 0;">2. Двухсторонняя изоляция через переменные окружения</h3>
+<p>При одновременном запуске нескольких сборочных конвейеров на одном физическом сервере процессы Конфигуратора <strong>неизбежно сталкиваются с конфликтами захвата файлов блокировок (<code>*.1cLck</code>, <code>1Cv8.lk</code>)</strong> или мешают друг другу во временных базах данных.</p>
+
+<p>Для решения этой проблемы мы передаем внутрь контейнера переменную <strong><code>RUN_ID</code></strong>, значением которой выступает уникальный идентификатор текущего запуска GitHub Actions (<strong><code>${{ github.run_id }}</code></strong>). Наш сборочный скрипт использует этот идентификатор для создания <strong>изолированных каталогов временных файлов и выделенных баз данных</strong>, гарантируя <strong>полное отсутствие коллизий при параллельной работе</strong>.</p>
+
+<h3 style="font-size: 15px; color: #0366d6; margin: 18px 0 8px 0;">3. Безопасность инфраструктурных параметров через GitHub Secrets</h3>
+<p>Адрес сервера лицензирования или параметры подключения к базам данных <strong>ни при каких условиях не должны храниться в публичном репозитории в открытом виде</strong>. Это создает прямую угрозу компрометации защищенного контура предприятия.</p>
+
+<p>Мы используем механизм шифрованных секретов <strong>GitHub Secrets</strong>. Переменная <code>HASP_SERVER_IP</code> наполняется динамически из секрета <code>${{ secrets.HASP_SERVER_IP }}</code>. Значение <strong>автоматически маскируется в логах сборки</strong> и передается исключительно в переменные окружения контейнера на время выполнения шага. Наш сборочный скрипт считывает эту переменную и <strong>на лету подставляет её в файл конфигурации <code>nethasp.ini</code></strong>, обеспечивая <strong>строгую точечную адресацию без сетевых таймаутов</strong>.</p>
+
+<h2 id="community-contribute" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🤝 Подключайтесь к развитию проекта</h2>
+
+<p>Наш конфигурационный файл GitHub Actions представляет собой <strong>готовое промышленное решение</strong>, которое легко масштабировать под любые другие платформы автоматизации: <strong>GitLab CI, TeamCity или Jenkins</strong>.</p>
+
+<p>Мы продолжаем активную разработку <strong>1C:SRE-Suite</strong> на GitHub и приглашаем инженеров принять участие в формировании открытых отраслевых стандартов эксплуатации 1С.</p>
+
+<div style="background-color: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px 20px; margin: 16px 0;">
+<strong style="display: block; margin-bottom: 10px; color: #1b1f23; font-size: 14px;">Приоритетные задачи в рамках CI/CD-модулей прямо сейчас:</strong>
+<ul style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 13.5px; color: #24292e;">
+	<li><strong>Оптимизация кэширования слоев Docker</strong> для многократного ускорения повторной сборки раннера.</li>
+	<li><strong>Публикация результатов синтаксического контроля в формате JUnit</strong> для наглядных отчетов в интерфейсе Git.</li>
+	<li><strong>Интеграция шага автоматического запуска автотестов Vanessa-Automation и YAxUnit</strong> в headless-режиме непосредственно после успешной синтаксической сборки.</li>
+</ul>
+</div>
+
+<p>Готовый файл <code>github-actions-ci.yml</code> доступен в репозитории проекта и готов к внедрению в ваши рабочие контуры. Ждем ваши отзывы, архитектурные идеи в разделе Issue и пул-реквесты в репозитории <strong>NickScherbakov/1c-sre-suite</strong>!</p>
+
+<div style="background-color: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 18px 20px; margin: 20px 0;">
+<p style="margin: 0 0 10px 0; font-size: 14px; color: #24292e;">Проект распространяется под открытой коммерческой <strong>лицензией MIT</strong>: вы можете свободно использовать его, дорабатывать и внедрять в инфраструктуру своего предприятия.</p>
+
+<p style="margin: 0 0 12px 0;">
+<a href="https://github.com/NickScherbakov/1c-sre-suite" rel="noopener noreferrer" style="display: inline-block; background-color: #0366d6; color: #ffffff; padding: 9px 18px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;" target="_blank">Перейти в репозиторий NickScherbakov/1c-sre-suite на GitHub &rarr;</a>
+</p>
+
+<p style="margin: 0; font-size: 13px; color: #586069;">Присоединяйтесь к дискуссиям и разработке в сообществе: <a href="https://t.me/+IUgiuMTuBLg3ZWVi" rel="noopener noreferrer" style="color: #0366d6; text-decoration: underline;" target="_blank">Телеграм-чат Инфостарт</a>.</p>
+</div>
+
+<hr style="border: none; border-top: 1px solid #e1e4e8; margin: 30px 0 20px 0;" />
+
+<div style="font-size: 13px; color: #586069; background: #fafbfc; border-radius: 6px; padding: 12px 16px;">
+<p style="margin: 0 0 4px 0;"><em>Материал подготовлен для сообщества DevOps-инженеров, системных администраторов и архитекторов &laquo;1С:Предприятия&raquo;.</em></p>
+<p style="margin: 0;"><strong>Нинель и Николай Щербаковы</strong> &mdash; декларативная инфраструктура, SRE и интеллектуальная автоматизация экосистемы 1С на Linux.</p>
+</div>
+
+</div>
