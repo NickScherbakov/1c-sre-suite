@@ -1,0 +1,57 @@
+name: 1C:SRE-Suite CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  syntax-check:
+    name: Syntax Control and Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Node.js Dependencies
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+          else
+            echo "Файл package.json не найден, пропуск установки npm"
+          fi
+
+      - name: Build SRE-Runner Docker Image
+        run: |
+          if [ -f docker/Dockerfile ]; then
+            docker build -t 1c-sre-runner:latest -f docker/Dockerfile .
+          else
+            echo "Критическая ошибка: docker/Dockerfile не найден"
+            exit 1
+          fi
+
+      - name: Execute 1C Syntax Check inside Container
+        env:
+          RUN_ID: ${{ github.run_id }}
+          # Сюда можно передать адрес сервера лицензирования, если требуется
+          HASP_SERVER_IP: ${{ secrets.HASP_SERVER_IP }}
+        run: |
+          # Запускаем контейнер в сети хоста для беспрепятственного поиска HASP-лицензий
+          # Монтируем рабочую директорию репозитория внутрь контейнера
+          docker run --rm \
+            --net=host \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e RUN_ID="$RUN_ID" \
+            -e HASP_SERVER_IP="$HASP_SERVER_IP" \
+            1c-sre-runner:latest \
+            bash scripts/1c-ci-linux-build-v4.sh
