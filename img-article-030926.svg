@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <!-- Фоновый градиент (GitHub Dark) -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d13" />
+      <stop offset="50%" stop-color="#0d1117" />
+      <stop offset="100%" stop-color="#161b22" />
+    </linearGradient>
+
+    <!-- Свечение пайплайна -->
+    <radialGradient id="glowBlue" cx="80%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#1f6feb" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#1f6feb" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glowGreen" cx="75%" cy="65%" r="40%">
+      <stop offset="0%" stop-color="#238636" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#238636" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Сетка карточек -->
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#21262d" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#161b22" stop-opacity="0.9" />
+    </linearGradient>
+  </defs>
+
+  <!-- Фон -->
+  <rect width="1200" height="675" fill="url(#bgGradient)" />
+  <rect width="1200" height="675" fill="url(#glowBlue)" />
+  <rect width="1200" height="675" fill="url(#glowGreen)" />
+
+  <!-- Декоративная фоновая сетка -->
+  <g stroke="#30363d" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="4 8">
+    <line x1="60" y1="120" x2="1140" y2="120" />
+    <line x1="60" y1="520" x2="1140" y2="520" />
+    <line x1="60" y1="120" x2="60" y2="520" />
+    <line x1="1140" y1="120" x2="1140" y2="520" />
+  </g>
+
+  <!-- ВЕРХНЯЯ СТРОКА: Бейджи и статус -->
+  <g transform="translate(60, 50)">
+    <!-- Серия -->
+    <rect width="210" height="32" rx="6" fill="#1f6feb" fill-opacity="0.18" stroke="#388bfd" stroke-width="1.2" />
+    <text x="15" y="21" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#58a6ff" letter-spacing="1">1C:SRE-SUITE • ЧАСТЬ 2</text>
+
+    <!-- Раннер статус -->
+    <g transform="translate(850, 0)">
+      <rect width="230" height="32" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.2" />
+      <circle cx="18" cy="16" r="4.5" fill="#3fb950" />
+      <text x="32" y="20" font-family="Consolas, 'JetBrains Mono', monospace" font-size="12" font-weight="600" fill="#c9d1d9">1c-sre-runner:latest</text>
+    </g>
+  </g>
+
+  <!-- ЗАГОЛОВОК И ПОДЗАГОЛОВОК -->
+  <g transform="translate(60, 150)">
+    <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#ffffff" letter-spacing="-0.5">CI/CD для 1С в GitHub Actions</text>
+    <text x="0" y="42" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="21" font-weight="500" fill="#8b949e">
+      Docker <tspan fill="#e3b341" font-family="Consolas, monospace" font-weight="700">--net=host</tspan>, изоляция <tspan fill="#e3b341" font-family="Consolas, monospace" font-weight="700">RUN_ID</tspan> и победа над False Success
+    </text>
+  </g>
+
+  <!-- СХЕМА ПАЙПЛАЙНА (4 НОДЫ) -->
+  <g transform="translate(60, 245)">
+    <!-- Соединительная шина -->
+    <line x1="80" y1="90" x2="1000" y2="90" stroke="#30363d" stroke-width="3" />
+    <line x1="80" y1="90" x2="750" y2="90" stroke="#238636" stroke-width="3" stroke-dasharray="8 6" />
+
+    <!-- Нода 1: Git Push -->
+    <g transform="translate(0, 10)">
+      <rect width="235" height="155" rx="8" fill="url(#cardGrad)" stroke="#30363d" stroke-width="1.5" />
+      <rect x="16" y="16" width="30" height="30" rx="6" fill="#21262d" />
+      <text x="24" y="37" font-family="-apple-system, sans-serif" font-size="18" fill="#58a6ff">⎇</text>
+      <text x="56" y="36" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#ffffff">actions/checkout</text>
+      <line x1="16" y1="58" x2="219" y2="58" stroke="#30363d" stroke-width="1" />
+      <text x="16" y="85" font-family="Consolas, monospace" font-size="12" fill="#8b949e">fetch-depth: 0</text>
+      <text x="16" y="107" font-family="-apple-system, sans-serif" font-size="12" fill="#c9d1d9">Полная история коммитов</text>
+      <text x="16" y="128" font-family="-apple-system, sans-serif" font-size="11" fill="#7ee787">✓ База для Git Diff</text>
+    </g>
+
+    <!-- Нода 2: Node.js & EDT -->
+    <g transform="translate(280, 10)">
+      <rect width="235" height="155" rx="8" fill="url(#cardGrad)" stroke="#30363d" stroke-width="1.5" />
+      <rect x="16" y="16" width="30" height="30" rx="6" fill="#21262d" />
+      <text x="24" y="36" font-family="-apple-system, sans-serif" font-size="16" fill="#7ee787">⬢</text>
+      <text x="56" y="36" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#ffffff">Node.js CLI-Bridge</text>
+      <line x1="16" y1="58" x2="219" y2="58" stroke="#30363d" stroke-width="1" />
+      <text x="16" y="85" font-family="Consolas, monospace" font-size="12" fill="#8b949e">edt-to-configurator</text>
+      <text x="16" y="107" font-family="-apple-system, sans-serif" font-size="12" fill="#c9d1d9">Трансляция проекта</text>
+      <text x="16" y="128" font-family="-apple-system, sans-serif" font-size="11" fill="#7ee787">✓ Экспорт в .cfe / .cf</text>
+    </g>
+
+    <!-- Нода 3: Docker & HASP -->
+    <g transform="translate(560, 10)">
+      <rect width="235" height="155" rx="8" fill="url(#cardGrad)" stroke="#1f6feb" stroke-width="1.5" />
+      <rect x="16" y="16" width="30" height="30" rx="6" fill="#1f6feb" fill-opacity="0.2" />
+      <text x="23" y="37" font-family="-apple-system, sans-serif" font-size="16" fill="#58a6ff">🐳</text>
+      <text x="56" y="36" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#ffffff">Docker Headless</text>
+      <line x1="16" y1="58" x2="219" y2="58" stroke="#30363d" stroke-width="1" />
+      <text x="16" y="85" font-family="Consolas, monospace" font-size="12" fill="#e3b341">--net=host</text>
+      <text x="16" y="107" font-family="-apple-system, sans-serif" font-size="12" fill="#c9d1d9">HASP UDP broadcast</text>
+      <text x="16" y="128" font-family="Consolas, monospace" font-size="11" fill="#58a6ff">RUN_ID isolation</text>
+    </g>
+
+    <!-- Нода 4: 5 Рубежей & Status 0 -->
+    <g transform="translate(840, 10)">
+      <rect width="240" height="155" rx="8" fill="url(#cardGrad)" stroke="#238636" stroke-width="1.8" />
+      <rect x="16" y="16" width="30" height="30" rx="6" fill="#238636" fill-opacity="0.2" />
+      <text x="24" y="36" font-family="-apple-system, sans-serif" font-size="16" fill="#3fb950">🛡</text>
+      <text x="56" y="36" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#ffffff">Quality Gate</text>
+      <line x1="16" y1="58" x2="224" y2="58" stroke="#30363d" stroke-width="1" />
+      <text x="16" y="85" font-family="Consolas, monospace" font-size="12" fill="#3fb950">STATUS == 0 (REAL)</text>
+      <text x="16" y="107" font-family="-apple-system, sans-serif" font-size="12" fill="#c9d1d9">5 слоев верификации</text>
+      <text x="16" y="128" font-family="-apple-system, sans-serif" font-size="11" fill="#7ee787">✓ No False Success</text>
+    </g>
+  </g>
+
+  <!-- НИЖНЯЯ ПАНЕЛЬ: Теги и репозиторий -->
+  <g transform="translate(60, 560)">
+    <!-- Тег 1 -->
+    <rect x="0" y="0" width="165" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.2" />
+    <text x="14" y="23" font-family="-apple-system, sans-serif" font-size="13" font-weight="600" fill="#c9d1d9">🛡️ 5 рубежей защиты</text>
+
+    <!-- Тег 2 -->
+    <rect x="180" y="0" width="185" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.2" />
+    <text x="14" y="23" transform="translate(180, 0)" font-family="-apple-system, sans-serif" font-size="13" font-weight="600" fill="#c9d1d9">⚡ Без False Success</text>
+
+    <!-- Тег 3 -->
+    <rect x="380" y="0" width="145" height="36" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1.2" />
+    <text x="14" y="23" transform="translate(380, 0)" font-family="-apple-system, sans-serif" font-size="13" font-weight="600" fill="#c9d1d9">📜 Лицензия MIT</text>
+
+    <!-- Ссылка на репозиторий справа -->
+    <g transform="translate(730, 8)">
+      <text x="350" y="16" font-family="Consolas, 'JetBrains Mono', monospace" font-size="14" font-weight="600" fill="#58a6ff" text-anchor="end">github.com/NickScherbakov/1c-sre-suite</text>
+    </g>
+  </g>
+</svg>
