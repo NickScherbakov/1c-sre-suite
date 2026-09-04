@@ -4,6 +4,10 @@
 
 <a href="https://infostart.ru/public/2780378/"><img src="https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg" alt="Infostart" style="vertical-align: middle;"></a> - Вторая часть
 
+<br>
+
+<a href="https://infostart.ru/public/2781587/"><img src="https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg" alt="Infostart" style="vertical-align: middle;"></a> - Третья часть
+
 # DevOps & Stability Enterprise Suite for 1C on Linux
 
 Комплекс инструментов обеспечения надежности, непрерывной интеграции (CI/CD) и автоматизированной эксплуатации крупных кластеров «1С:Предприятие 8.3» на платформе Linux.
