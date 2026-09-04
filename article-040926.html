@@ -1,0 +1,303 @@
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e;">
+
+<div style="background: #f6f8fa; border-left: 5px solid #0366d6; padding: 16px 20px; margin-bottom: 24px; border-radius: 0 6px 6px 0;">
+<h2 style="margin: 0 0 10px 0; color: #0366d6; font-size: 22px; border: none; padding: 0;">1C:SRE-Suite: автоматизируем маскирование данных через pg_anon в CI/CD без промежуточных копий</h2>
+
+<p style="font-size: 15px; color: #444d56; margin: 0 0 8px 0; font-weight: 500;">Потоковое обезличивание (<strong>On-The-Fly</strong>) на PostgreSQL, декларативные правила <strong style="font-size: 15.5px; font-family: Consolas, monospace; color: #0366d6;">pg-anon-1c.yml</strong>, защита PII и регламентный ночной пайплайн в <strong>GitHub Actions</strong> без сохранения промежуточных дампов на диске.</p>
+
+<p style="font-size: 13px; color: #586069; margin: 0;"><strong>Часть 3 практического руководства: от боевого терабайтного кластера до безопасного dev-дампа без угрозы компрометации персональных данных</strong></p>
+</div>
+
+<p>В первых двух частях нашей серии публикаций мы подробно разобрали построение <strong>отказоустойчивой инфраструктуры</strong>, создание пятислойного оборонительного контура сборки и его автоматизацию с помощью <strong>GitHub Actions</strong>. Эти инженерные шаги гарантируют надежную защиту продуктивного контура от попадания неработоспособного кода.</p>
+
+<div style="background-color: #f1f8ff; border: 1px solid #c8e1ff; border-left: 4px solid #0366d6; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 16px 0; font-size: 14px; line-height: 1.6; color: #24292e;">
+<strong>Связь с предыдущими частями цикла:</strong> Рекомендуем ознакомиться со <a href="https://infostart.ru/1c/articles/2779597/" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">стартовой статьей об общей концепции SRE-пакета</a> и <a href="https://infostart.ru/1c/articles/2772158/" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">руководством по построению непрерывной интеграции (CI/CD)</a>.
+</div>
+
+<p>Однако в жизненном цикле разработки крупномасштабных корпоративных систем на платформе &laquo;1С:Предприятие 8.3&raquo; существует еще одна фундаментальная проблема — <strong>безопасность тестовых данных</strong>. Разработчикам, тестировщикам и автотестам для качественной работы необходимы <strong>актуальные данные из продуктивной базы</strong>. При этом передача реальных персональных данных или коммерческой тайны на рабочие станции программистов и серверы тестирования <strong>строго запрещена требованиями регуляторов и корпоративными стандартами безопасности</strong>.</p>
+
+<p>В третьей части нашего цикла мы рассмотрим, как <strong>полностью автоматизировать процесс маскирования многогигабайтных и терабайтных баз данных 1С на СУБД PostgreSQL</strong> с помощью бесплатного инструмента <a href="https://infostart.ru/1c/articles/2747170/" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">pg_anon</a> в рамках автоматического пайплайна, <strong>полностью избегая создания небезопасных промежуточных копий на диске</strong>. Исходный код проекта доступен на GitHub: <a href="https://github.com/NickScherbakov/1c-sre-suite" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">NickScherbakov/1c-sre-suite</a>.</p>
+
+<div style="background: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 14px 18px; margin: 20px 0;">
+<strong style="display: block; margin-bottom: 8px; color: #24292e; font-size: 14px;">Оглавление:</strong>
+
+<ol style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14px; color: #0366d6;">
+	<li><a href="#traditional-flaws" style="color: #0366d6; text-decoration: none;">Проблема традиционного подхода к маскированию</a></li>
+	<li><a href="#on-the-fly-concept" style="color: #0366d6; text-decoration: none;">Концепция маскирования в потоке (On-The-Fly)</a></li>
+	<li><a href="#declarative-rules" style="color: #0366d6; text-decoration: none;">Разбор декларативных правил pg-anon-1c.yml</a></li>
+	<li><a href="#pipeline-script" style="color: #0366d6; text-decoration: none;">Автоматизация конвейера: anonymize-pipeline.sh</a></li>
+	<li><a href="#ci-integration" style="color: #0366d6; text-decoration: none;">Интеграция в сквозной CI/CD-пайплайн</a></li>
+	<li><a href="#future-roadmap" style="color: #0366d6; text-decoration: none;">Перспективы развития модуля маскирования</a></li>
+</ol>
+</div>
+
+<h2 id="traditional-flaws" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">📂 Проблема традиционного подхода к маскированию</h2>
+
+<p>Обычный процесс подготовки тестовой базы традиционно состоит из трех последовательных этапов:</p>
+<ol style="margin: 0 0 16px 0; padding-left: 22px; line-height: 1.8; font-size: 14px; color: #24292e;">
+	<li>Выгрузка полного резервного копирования (дампа) продуктивной базы на диск временного сервера.</li>
+	<li>Восстановление этого дампа в промежуточную техническую СУБД.</li>
+	<li>Запуск скриптов очистки и маскирования данных.</li>
+</ol>
+
+<p>Этот классический подход несет в себе <strong>три критических инженерных недостатка</strong>:</p>
+
+<table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+	<thead>
+		<tr style="background-color: #f6f8fa;">
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 22%; text-align: left; color: #1f2328;">Критерий</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 39%; text-align: left; color: #1f2328;">Традиционный подход (Dump &rarr; Restore &rarr; Clean)</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 39%; text-align: left; color: #1f2328;">Подход 1C:SRE-Suite (pg_anon On-The-Fly)</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">1. Безопасность PII</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong>Часы открытого хранения</strong> боевого дампа с персональными данными на staging-сервере.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong>Полное отсутствие сырого дампа на диске</strong>: данные обезличиваются в потоке оперативной памяти.</td>
+		</tr>
+		<tr style="background-color: #fcfcfc;">
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">2. Расход диска</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Требуется <strong>2-3 объема базы данных</strong> (дамп + staging-база + результирующий файл).</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong>1 объем</strong>: потоковая трансляция через RAM-диск/NVMe без промежуточных копий.</td>
+		</tr>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">3. Скорость конвейера</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong>Двойной I/O-оверхед</strong>: ресурсы тратятся на долгую физическую запись и повторное чтение с диска.</td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong>Линейная скорость сети</strong>: пайплайн ограничен только производительностью потока СУБД.</td>
+		</tr>
+	</tbody>
+</table>
+
+<ul style="margin: 0; padding-left: 20px; line-height: 1.8; font-size: 14px; color: #24292e;">
+	<li><strong style="color: #0366d6;">Угроза безопасности:</strong> на протяжении нескольких часов на диске промежуточного сервера в открытом виде хранится <strong>точный слепок боевой базы</strong> со всеми персональными данными, окладами сотрудников и финансовыми операциями. Любой несанкционированный доступ приведет к полной компрометации защищаемого периметра.</li>
+	<li><strong style="color: #0366d6;">Дефицит дискового пространства:</strong> для терабайтной базы данных 1С:ERP требуется <strong>как минимум два, а чаще три терабайта свободного места</strong> на staging-сервере.</li>
+	<li><strong style="color: #0366d6;">Низкая скорость работы:</strong> операции записи промежуточного дампа на накопитель и его обратного вычитывания <strong>критически замедляют весь цикл подготовки стендов</strong>.</li>
+</ul>
+
+<h2 id="on-the-fly-concept" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🏛️ Концепция маскирования в потоке (On-The-Fly)</h2>
+
+<p>Для решения этих проблем в рамках открытого проекта <a href="https://infostart.ru/1c/articles/2779597/" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">1C:SRE-Suite</a> разработан модуль маскирования, который задействует стандартный механизм <strong>Unix-пайпов (pipes)</strong> для непрерывной потоковой передачи данных между продуктивной и временной базами. Это полностью исключает стадию записи незащищенного дампа на диск.</p>
+
+<p>Ниже приведена схема прохождения данных в нашем автоматизированном скрипте <strong style="font-size: 15.5px; font-family: Consolas, monospace; color: #0366d6;">anonymize-pipeline.sh</strong>:</p>
+
+<div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+    <span>Bash &mdash; Потоковая передача без сохранения промежуточного дампа на диск</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Stream Pipe</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+    <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;"><span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">1</span>pg_dump -h $DB_HOST -Fc production_1c \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">2</span>  | pg_restore -h $DB_HOST -d stage_anonymized_1c</pre>
+  </div>
+</div>
+
+<p>Поток байтов резервной копии продуктивного контура передается по защищенной сети и <strong>сразу разворачивается в изолированную временную базу данных</strong>, размещенную в СУБД на быстром RAM-диске или скоростном NVMe-накопителе. <strong>Дисковая подсистема хоста вообще не задействуется для промежуточных файлов</strong>.</p>
+
+<h2 id="declarative-rules" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🛠️ Разбор декларативных правил <strong style="font-size: 19px; font-family: Consolas, monospace; color: #0366d6;">pg-anon-1c.yml</strong></h2>
+
+<p>Специфика маскирования баз данных платформы 1С заключается в <strong>динамической генерации имен таблиц и полей на уровне СУБД</strong>. Вместо понятных названий таблиц физических лиц или регистров адресов мы сталкиваемся с именами вида <code>_Reference112</code> и <code>_InfoRg1120</code>, а также полями <code>_Fld1004</code> или <code>_Fld1122</code>.</p>
+
+<p>Конфигурационный файл <strong style="font-size: 15.5px; font-family: Consolas, monospace; color: #0366d6;">pg-anon-1c.yml</strong> решает эту проблему путем описания точечных правил маскирования для этих специфических таблиц:</p>
+
+<div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+    <span>YAML &mdash; Декларативные правила маскирования config/pg-anon-1c.yml</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Rules Config</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+    <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;"><span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 1</span># pg_anon configuration template for 1C:Enterprise on PostgreSQL
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 2</span># Данный файл описывает правила маскирования персональных данных (PII) в СУБД для сред разработки (Dev/Test)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 3</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 4</span>dictionary:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 5</span>  # Словарь для генерации реалистичных замен
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 6</span>  first_names: [&quot;Иван&quot;, &quot;Петр&quot;, &quot;Сергей&quot;, &quot;Алексей&quot;, &quot;Дмитрий&quot;, &quot;Елена&quot;, &quot;Мария&quot;, &quot;Ольга&quot;, &quot;Анна&quot;]
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 7</span>  last_names: [&quot;Иванов&quot;, &quot;Петров&quot;, &quot;Сидоров&quot;, &quot;Смирнов&quot;, &quot;Кузнецов&quot;, &quot;Попова&quot;, &quot;Васильева&quot;]
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 8</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 9</span>rules:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">10</span>  # Пример маскирования таблицы физических лиц (например, _Reference112)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">11</span>  - table: &quot;_Reference112&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">12</span>    columns:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">13</span>      # Поле Наименование (обычно содержит ФИО)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">14</span>      - name: &quot;_Description&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">15</span>        provider: &quot;faker&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">16</span>        mask: &quot;last_names + ' ' + first_names&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">17</span>      # Поле ИНН (например, _Fld1004)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">18</span>      - name: &quot;_Fld1004&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">19</span>        provider: &quot;random_digits&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">20</span>        length: 12
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">21</span>      # Поле СНИЛС (например, _Fld1005)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">22</span>      - name: &quot;_Fld1005&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">23</span>        provider: &quot;hash&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">24</span>        salt: &quot;sre_salt_123&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">25</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">26</span>  # Пример маскирования контактной информации (таблица _InfoRg1120)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">27</span>  - table: &quot;_InfoRg1120&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">28</span>    columns:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">29</span>      # Поле Представление (телефон, адрес)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">30</span>      - name: &quot;_Fld1122&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">31</span>        provider: &quot;faker&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">32</span>        mask: &quot;'+7 (999) ' + random_digits(7)&quot;</pre>
+  </div>
+</div>
+
+<p>Использование встроенного провайдера <code>faker</code> позволяет формировать связные, реалистичные и грамматически корректные ФИО, адреса и телефоны. Использование провайдера <code>hash</code> с секретной солью гарантирует, что ИНН и СНИЛС заменяются на уникальные псевдослучайные значения. Это <strong>критически важно для сохранения целостности индексов СУБД и уникальности бизнес-ключей в 1С</strong>.</p>
+
+<h2 id="pipeline-script" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">⚙️ Автоматизация конвейера: <strong style="font-size: 19px; font-family: Consolas, monospace; color: #0366d6;">anonymize-pipeline.sh</strong></h2>
+
+<p>Наш скрипт-оркестратор <strong style="font-size: 15.5px; font-family: Consolas, monospace; color: #0366d6;">anonymize-pipeline.sh</strong> выполняет полный цикл подготовки базы данных под ключ за <strong>шесть детерминированных технологических шагов</strong>:</p>
+<ol style="margin: 0 0 16px 0; padding-left: 22px; line-height: 1.8; font-size: 13.5px; color: #24292e;">
+	<li><strong>Создание изолированной базы маскирования:</strong> скрипт разворачивает временную СУБД <code>stage_anonymized_1c</code> на сервере маскирования.</li>
+	<li><strong>Потоковое копирование структуры и данных:</strong> данные переносятся напрямую из боевой базы через конвейер СУБД <code>pg_dump | pg_restore</code> без дисковых операций.</li>
+	<li><strong>Применение маскирования pg_anon:</strong> запускается утилита <code>pg_anon</code> с использованием нашего декларативного файла правил <strong style="font-size: 15.5px; font-family: Consolas, monospace; color: #0366d6;">pg-anon-1c.yml</strong>.</li>
+	<li><strong>Пост-обработка 1С (Post-anonymization sql script):</strong> на этом шаге выполняются специфические для 1С SQL-команды очистки сессионного мусора. Мы <strong>сбрасываем пароли пользователей в <code>v8users</code></strong> и <strong>очищаем таблицы регистрации изменений</strong> (<code>_ConfigChngR</code>, <code>_AccumRegChgR</code>, <code>_InfoRgChgR</code>) для предотвращения ложной отправки тестовых данных через планы обмена в смежные системы.</li>
+	<li><strong>Экспорт готового дамп-файла:</strong> очищенная база выгружается в сжатый файл <code>anonymized_dev.dump</code>.</li>
+	<li><strong>Полная деструкция временных ресурсов:</strong> база <code>stage_anonymized_1c</code> полностью удаляется из СУБД, гарантируя чистоту окружения.</li>
+</ol>
+
+<div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+    <span>Bash &mdash; Полный скрипт автоматизации scripts/anonymize-pipeline.sh</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Pipeline Script</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+    <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;"><span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 1</span>#!/usr/bin/env bash
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 2</span># Скрипт автоматического маскирования базы данных 1С на PostgreSQL с помощью pg_anon
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 3</span># Реализует концепцию: Безопасный пайплайн без промежуточной копии на диске
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 4</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 5</span>set -euo pipefail
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 6</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 7</span># Переменные по умолчанию
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 8</span>DB_HOST=&quot;${DB_HOST:-localhost}&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 9</span>DB_PORT=&quot;${DB_PORT:-5432}&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">10</span>DB_USER=&quot;${DB_USER:-postgres}&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">11</span>DB_PASS=&quot;${DB_PASS:-}&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">12</span>PROD_DB=&quot;production_1c&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">13</span>ANON_STAGE_DB=&quot;stage_anonymized_1c&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">14</span>RULES_FILE=&quot;config/pg-anon-1c.yml&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">15</span>OUTPUT_DUMP=&quot;/workspace/out/anonymized_dev.dump&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">16</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">17</span>echo &quot;[*] Старт процесса обезличивания базы данных...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">18</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">19</span># Шаг 1. Создание изолированной базы данных для маскирования
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">20</span>echo &quot;[*] Создание staging СУБД: $ANON_STAGE_DB...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">21</span>PGPASSWORD=&quot;$DB_PASS&quot; dropdb -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; --if-exists &quot;$ANON_STAGE_DB&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">22</span>PGPASSWORD=&quot;$DB_PASS&quot; createdb -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; -O &quot;$DB_USER&quot; &quot;$ANON_STAGE_DB&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">23</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">24</span># Шаг 2. Копирование структуры и данных напрямую через конвейер (без сохранения промежуточного дампа на диск)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">25</span>echo &quot;[*] Перенос данных из $PROD_DB в $ANON_STAGE_DB в потоке...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">26</span>PGPASSWORD=&quot;$DB_PASS&quot; pg_dump -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; -Fc &quot;$PROD_DB&quot; \
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">27</span>  | PGPASSWORD=&quot;$DB_PASS&quot; pg_restore -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; -d &quot;$ANON_STAGE_DB&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">28</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">29</span># Шаг 3. Применение правил обезличивания pg_anon
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">30</span>echo &quot;[*] Запуск маскирования pg_anon...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">31</span>if [ -f &quot;$RULES_FILE&quot; ]; then
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">32</span>  pg_anon -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; -d &quot;$ANON_STAGE_DB&quot; -c &quot;$RULES_FILE&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">33</span>else
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">34</span>  echo &quot;[-] Ошибка: Файл правил $RULES_FILE не найден!&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">35</span>  exit 1
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">36</span>fi
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">37</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">38</span># Шаг 4. Очистка сеансовых и служебных данных 1С (Post-anonymization sql script)
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">39</span>echo &quot;[*] Выполнение пост-обработки СУБД для среды разработки...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">40</span>PGPASSWORD=&quot;$DB_PASS&quot; psql -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; -d &quot;$ANON_STAGE_DB&quot; &lt;&lt; 'SQL'
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">41</span>-- 1. Сброс паролей всех пользователей для возможности входа разработчиков
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">42</span>UPDATE v8users SET password = '';
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">43</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">44</span>-- 2. Очистка истории активных сеансов и блокировок в системных таблицах
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">45</span>-- Удаление блокировок и активных соединений, специфичных для метаданных платформы
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">46</span>DELETE FROM _ConfigChngR;        -- Очистка таблиц регистрации изменений метаданных
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">47</span>DELETE FROM _AccumRegChgR;       -- Очистка регистрации изменений регистров накопления
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">48</span>DELETE FROM _InfoRgChgR;         -- Очистка регистрации изменений регистров сведений
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">49</span>SQL
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">50</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">51</span># Шаг 5. Экспорт готового обезличенного дампа для разработчиков
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">52</span>echo &quot;[*] Создание чистого дампа для разработчиков...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">53</span>PGPASSWORD=&quot;$DB_PASS&quot; pg_dump -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; -Fc -d &quot;$ANON_STAGE_DB&quot; -f &quot;$OUTPUT_DUMP&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">54</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">55</span># Шаг 6. Удаление временной базы маскирования
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">56</span>echo &quot;[*] Удаление staging СУБД $ANON_STAGE_DB...&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">57</span>PGPASSWORD=&quot;$DB_PASS&quot; dropdb -h &quot;$DB_HOST&quot; -p &quot;$DB_PORT&quot; -U &quot;$DB_USER&quot; &quot;$ANON_STAGE_DB&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">58</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">59</span>echo &quot;[+] Обезличивание успешно завершено! Дамп сохранен в $OUTPUT_DUMP&quot;
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">60</span>exit 0</pre>
+  </div>
+</div>
+
+<h2 id="ci-integration" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🔌 Интеграция в сквозной CI/CD-пайплайн</h2>
+
+<p>Включение процесса маскирования в общий цикл доставки изменений выполняется добавлением отдельного джоба в наш ранее описанный файл конфигурации. Подробное руководство по контейнеризации и безопасному пробросу лицензий доступно в нашей статье <a href="https://infostart.ru/1c/articles/2775083/" rel="noopener noreferrer" style="color: #0366d6; font-weight: 600; text-decoration: underline;" target="_blank">по интеграции CI/CD 1С:Предприятие в Docker</a>. Поскольку процесс маскирования крупной базы данных требует времени, этот шаг рекомендуется настраивать на <strong>регламентный ночной запуск по расписанию (cron)</strong>:</p>
+
+<div style="background-color: #f4f6f9; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: space-between; align-items: center;">
+    <span>YAML &mdash; Фрагмент GitHub Actions Workflow (.github/workflows/ci.yml)</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Workflow Job</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f4f6f9;">
+    <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0;"><span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 1</span>  anonymize-db:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 2</span>    name: Nightly Database Anonymization
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 3</span>    runs-on: ubuntu-latest
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 4</span>    if: github.event_name == 'schedule'
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 5</span>    steps:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 6</span>      - name: Checkout repository
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 7</span>        uses: actions/checkout@v4
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 8</span>
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;"> 9</span>      - name: Run Anonymization Script
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">10</span>        env:
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">11</span>          DB_HOST: ${{ secrets.PROD_DB_HOST }}
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">12</span>          DB_PASS: ${{ secrets.PROD_DB_PASSWORD }}
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">13</span>        run: |\
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">14</span>          chmod +x scripts/anonymize-pipeline.sh
+<span style="display: inline-block; width: 24px; text-align: right; padding-right: 10px; margin-right: 10px; color: #8c959f; border-right: 1px solid #d0d7de; user-select: none; -webkit-user-select: none;">15</span>          ./scripts/anonymize-pipeline.sh</pre>
+  </div>
+</div>
+
+<p>В результате выполнения этого джоба в защищенном S3-хранилище или на выделенном внутреннем файловом сервере каждую ночь будет обновляться <strong>готовый, проверенный и на 100% безопасный файл <code>anonymized_dev.dump</code></strong>. Разработчики смогут скачивать его одной командой и разворачивать на своих локальных машинах, не нарушая регламентов безопасности и коммерческой тайны.</p>
+
+<h2 id="future-roadmap" style="font-size: 18px; border-bottom: 2px solid #eaecef; padding-bottom: 6px; margin-top: 30px; color: #1b1f23;">🤝 Перспективы развития модуля маскирования</h2>
+
+<p>Наш декларативный подход позволяет гибко масштабировать правила маскирования под любую прикладную конфигурацию. В репозитории проекта <strong>NickScherbakov/1c-sre-suite</strong> мы планируем развивать этот модуль по следующим направлениям:</p>
+
+<table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13.5px;">
+	<thead>
+		<tr style="background-color: #f6f8fa;">
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 30%; text-align: left; color: #1f2328;">Вектор развития</th>
+			<th style="border: 1px solid #dcdfe6; padding: 10px 12px; width: 70%; text-align: left; color: #1f2328;">Инженерные задачи и цели</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">1. Многопоточный движок</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Параллелизация маскирования независимых таблиц через пул параллельных рабочих процессов <code>pg_anon</code>.</td>
+		</tr>
+		<tr style="background-color: #fcfcfc;">
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">2. Автогенерация схем</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Node.js-утилита автоматической генерации YAML-правил из метаданных выгруженного XML-проекта 1C:EDT.</td>
+		</tr>
+		<tr>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;"><strong style="color: #0366d6;">3. Готовые шаблоны ERP/ЗУП</strong></td>
+			<td style="border: 1px solid #dcdfe6; padding: 10px 12px; vertical-align: top;">Публикация выверенных профилей маскирования для 1С:ERP, 1С:ЗУП и 1С:Управление торговлей 11.</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>Мы приглашаем SRE-инженеров, администраторов баз данных и разработчиков принять активное участие в тестировании и контрибьюте в проект! Делитесь опытом, пишите предложения в разделе Issue и присылайте ваши Pull Request'ы в репозиторий <strong>NickScherbakov/1c-sre-suite</strong>.</p>
+
+<div style="background-color: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 18px 20px; margin: 20px 0;">
+<p style="margin: 0 0 10px 0; font-size: 14px; color: #24292e;">Проект поставляется под открытой коммерческой <strong>лицензией MIT</strong>: вы можете свободно использовать его, дорабатывать и внедрять в инфраструктуру своего бизнеса.</p>
+
+<p style="margin: 0 0 12px 0;">
+<a href="https://github.com/NickScherbakov/1c-sre-suite" rel="noopener noreferrer" style="display: inline-block; background-color: #0366d6; color: #ffffff; padding: 9px 18px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;" target="_blank">Перейти в репозиторий NickScherbakov/1c-sre-suite на GitHub &rarr;</a>
+</p>
+
+<p style="margin: 0; font-size: 13px; color: #586069;">Вступайте в сообщество инженеров: <a href="https://t.me/+IUgiuMTuBLg3ZWVi" rel="noopener noreferrer" style="color: #0366d6; text-decoration: underline;" target="_blank">Телеграм-чат Инфостарт</a>.</p>
+</div>
+
+<hr style="border: none; border-top: 1px solid #e1e4e8; margin: 30px 0 20px 0;" />
+
+<div style="font-size: 13px; color: #586069; background: #fafbfc; border-radius: 6px; padding: 12px 16px;">
+<p style="margin: 0 0 4px 0;"><em>Материал подготовлен для сообщества DevOps-инженеров, системных администраторов и архитекторов &laquo;1С:Предприятия&raquo;.</em></p>
+<p style="margin: 0;"><strong>Нинель и Николай Щербаковы</strong> &mdash; декларативная инфраструктура, SRE и интеллектуальная автоматизация экосистемы 1С на Linux.</p>
+</div>
+
+</div>
