@@ -1,0 +1,32 @@
+# pg_anon configuration template for 1C:Enterprise on PostgreSQL
+# Данный файл описывает правила маскирования персональных данных (PII) в СУБД для сред разработки (Dev/Test)
+
+dictionary:
+  # Словарь для генерации реалистичных замен
+  first_names: ["Иван", "Петр", "Сергей", "Алексей", "Дмитрий", "Елена", "Мария", "Ольга", "Анна"]
+  last_names: ["Иванов", "Петров", "Сидоров", "Смирнов", "Кузнецов", "Попова", "Васильева"]
+
+rules:
+  # Пример маскирования таблицы физических лиц (например, _Reference112)
+  - table: "_Reference112"
+    columns:
+      # Поле Наименование (обычно содержит ФИО)
+      - name: "_Description"
+        provider: "faker"
+        mask: "last_names + ' ' + first_names"
+      # Поле ИНН (например, _Fld1004)
+      - name: "_Fld1004"
+        provider: "random_digits"
+        length: 12
+      # Поле СНИЛС (например, _Fld1005)
+      - name: "_Fld1005"
+        provider: "hash"
+        salt: "sre_salt_123"
+
+  # Пример маскирования контактной информации (таблица _InfoRg1120)
+  - table: "_InfoRg1120"
+    columns:
+      # Поле Представление (телефон, адрес)
+      - name: "_Fld1122"
+        provider: "faker"
+        mask: "'+7 (999) ' + random_digits(7)"
