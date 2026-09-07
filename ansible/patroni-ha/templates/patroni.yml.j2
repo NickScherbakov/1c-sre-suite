@@ -1,0 +1,72 @@
+scope: cluster-1c
+name: "{{ etcd_name }}"
+namespace: /db/
+
+log:
+  format: '%(asctime)s %(levelname)s: %(message)s'
+  level: INFO
+  max_queue_size: 1000
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: "{{ node_ip }}:8008"
+
+etcd3:
+  hosts:
+    - 192.168.100.101:2379
+    - 192.168.100.102:2379
+    - 192.168.100.103:2379
+
+bootstrap:
+  dcs:
+    loop_wait: 10
+    retry_timeout: 10
+    ttl: 30
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        hot_standby: "on"
+        max_connections: 250
+        max_locks_per_transaction: 256
+        max_prepared_transactions: 0
+        max_replication_slots: 10
+        max_wal_senders: 10
+        max_worker_processes: 8
+        track_commit_timestamp: "off"
+        wal_keep_size: 256MB
+        wal_level: replica
+        wal_log_hints: "on"
+        lc_messages: "ru_RU.UTF-8"
+        shared_buffers: 4GB
+        temp_buffers: 256MB
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+  pg_hba:
+    - host all all 0.0.0.0/0 md5
+    - host replication patroni_replication 0.0.0.0/0 md5
+
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: "{{ node_ip }}:5432"
+  bin_dir: "{{ pg_bin_dir }}"
+  data_dir: "{{ pg_data_dir }}"
+  authentication:
+    superuser:
+      username: patroni_superuser
+      password: SuperuserSecretPassword
+    replication:
+      username: patroni_replication
+      password: ReplicationSecretPassword
+    rewind:
+      username: patroni_rewind
+      password: RewindSecretPassword
+
+tags:
+  clonefrom: true
+  failover_priority: 1
+  noloadbalance: false
+  nosync: false
