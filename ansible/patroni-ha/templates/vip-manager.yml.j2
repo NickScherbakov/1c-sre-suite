@@ -1,0 +1,15 @@
+interval: 1000
+trigger-key: "/db/cluster-1c/leader"
+trigger-value: "{{ etcd_name }}"
+ip: "{{ vip_address }}"
+netmask: {{ vip_netmask }}
+interface: "{{ vip_interface }}"
+hosting-type: basic
+dcs-type: etcd
+dcs-endpoints:
+  - http://192.168.100.101:2379
+  - http://192.168.100.102:2379
+  - http://192.168.100.103:2379
+retry-num: 3
+retry-after: 250
+verbose: false

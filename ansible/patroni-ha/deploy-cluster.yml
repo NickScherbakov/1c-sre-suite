@@ -1,0 +1,126 @@
+---
+- name: Deploy High-Availability PostgreSQL Cluster for 1C
+  hosts: db_nodes
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Ensure ip_nonlocal_bind is enabled (allows binding virtual IP)
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        value: "1"
+        sysctl_set: true
+        state: present
+        reload: true
+
+    - name: Install dependencies (PostgreSQL Pro 1C and System Packages)
+      ansible.builtin.package:
+        name:
+          - etcd
+          - python3-pip
+          - python3-psycopg2
+          - iproute2
+        state: present
+
+    - name: Install Patroni via pip
+      ansible.builtin.pip:
+        name: patroni[etcd3]
+        state: present
+
+    - name: Ensure etcd configuration directory exists
+      ansible.builtin.file:
+        path: /etc/etcd
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Deploy etcd configuration
+      ansible.builtin.template:
+        src: templates/etcd.conf.j2
+        dest: /etc/etcd/etcd.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart etcd
+
+    - name: Enable and start etcd service
+      ansible.builtin.systemd:
+        name: etcd
+        enabled: true
+        state: started
+
+    - name: Stop and disable default PostgreSQL systemd service (managed by Patroni)
+      ansible.builtin.systemd:
+        name: postgrespro-1c-16
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Ensure Patroni configuration directory exists
+      ansible.builtin.file:
+        path: /etc/patroni
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0700"
+
+    - name: Deploy Patroni configuration
+      ansible.builtin.template:
+        src: templates/patroni.yml.j2
+        dest: /etc/patroni/patroni.yml
+        owner: postgres
+        group: postgres
+        mode: "0600"
+
+    - name: Deploy Patroni systemd service unit
+      ansible.builtin.template:
+        src: templates/patroni.service.j2
+        dest: /etc/systemd/system/patroni.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable and start Patroni service
+      ansible.builtin.systemd:
+        name: patroni
+        daemon_reload: true
+        enabled: true
+        state: started
+
+    - name: Download vip-manager package from official repository
+      ansible.builtin.get_url:
+        url: "https://github.com/cybertec-postgresql/vip-manager/releases/download/v5.0.0/vip-manager_5.0.0-1_amd64.deb"
+        dest: "/tmp/vip-manager_5.0.0_amd64.deb"
+        mode: "0644"
+
+    - name: Install vip-manager package
+      ansible.builtin.apt:
+        deb: "/tmp/vip-manager_5.0.0_amd64.deb"
+        state: present
+
+    - name: Ensure vip-manager default configuration exists
+      ansible.builtin.template:
+        src: templates/vip-manager.yml.j2
+        dest: /etc/default/vip-manager.yml
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart vip-manager
+
+    - name: Enable and start vip-manager service
+      ansible.builtin.systemd:
+        name: vip-manager
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart etcd
+      ansible.builtin.systemd:
+        name: etcd
+        state: restarted
+
+    - name: Restart vip-manager
+      ansible.builtin.systemd:
+        name: vip-manager
+        state: restarted
