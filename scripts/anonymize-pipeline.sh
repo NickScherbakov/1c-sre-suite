@@ -14,6 +14,12 @@ ANON_STAGE_DB="stage_anonymized_1c"
 RULES_FILE="config/pg-anon-1c.yml"
 OUTPUT_DUMP="/workspace/out/anonymized_dev.dump"
 
+# Путь к 1cv8 и к обработке для платформенной пост-обработки (см. post-anonymize-1c.bsl)
+PATH_1C="${PATH_1C:-/opt/1cv8/x86_64/current/1cv8}"
+POST_ANONYMIZE_EPF="${POST_ANONYMIZE_EPF:-scripts/post-anonymize-1c.epf}"
+IB_USER="${IB_USER:-Администратор}"
+IB_PASS="${IB_PASS:-}"
+
 echo "[*] Старт процесса обезличивания базы данных..."
 
 # Шаг 1. Создание изолированной базы данных для маскирования
@@ -35,18 +41,17 @@ else
   exit 1
 fi
 
-# Шаг 4. Очистка сеансовых и служебных данных 1С (Post-anonymization sql script)
-echo "[*] Выполнение пост-обработки СУБД для среды разработки..."
-PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$ANON_STAGE_DB" << 'SQL'
--- 1. Сброс паролей всех пользователей для возможности входа разработчиков
-UPDATE v8users SET password = '';
-
--- 2. Очистка истории активных сеансов и блокировок в системных таблицах
--- Удаление блокировок и активных соединений, специфичных для метаданных платформы
-DELETE FROM _ConfigChngR;        -- Очистка таблиц регистрации изменений метаданных
-DELETE FROM _AccumRegChgR;       -- Очистка регистрации изменений регистров накопления
-DELETE FROM _InfoRgChgR;         -- Очистка регистрации изменений регистров сведений
-SQL
+# Шаг 4. Пост-обработка для среды разработки: сброс паролей пользователей ИБ
+# и снятие регистрации изменений планов обмена. Выполняется средствами самой
+# платформы 1С:Предприятие (headless-запуск post-anonymize-1c.epf), а не прямыми
+# SQL-командами к таблицам СУБД — см. scripts/post-anonymize-1c.bsl (исходник
+# обработки) и правила публикации Infostart.ru о прямом доступе к СУБД 1С.
+echo "[*] Выполнение пост-обработки средствами платформы 1С..."
+"$PATH_1C" ENTERPRISE \
+  /S"${DB_HOST}/${ANON_STAGE_DB}" \
+  /N"$IB_USER" /P"$IB_PASS" \
+  /Execute "$POST_ANONYMIZE_EPF" \
+  /DisableStartupDialogs /DisableStartupMessages
 
 # Шаг 5. Экспорт готового обезличенного дампа для разработчиков
 echo "[*] Создание чистого дампа для разработчиков..."

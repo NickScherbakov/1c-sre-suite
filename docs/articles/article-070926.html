@@ -1,48 +1,46 @@
-<!-- 
+<!--
   Публикация для Infostart.ru: 1C:SRE-Suite (Часть 4)
   Стилизовано под визуальный стандарт серии публикаций Нинель и Николая Щербаковых
+  Синхронизировано с финальной опубликованной версией (infostart.ru/1c/articles/2783161/)
+  после приведения в соответствие с правилами модерации Infostart.ru
 -->
 
-<!-- Верхняя информационная плашка проекта -->
 <div style="background: #f4f8fc; border-left: 5px solid #0066cc; border-radius: 6px; padding: 18px 22px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-  <div style="font-size: 22px; font-weight: bold; color: #0066cc; line-height: 1.35; margin-bottom: 8px;">
-    1C:SRE-Suite — разворачиваем отказоустойчивый кластер PostgreSQL на&nbsp;базе Patroni и&nbsp;etcd с&nbsp;помощью Ansible без HAProxy
-  </div>
-  <div style="font-size: 15px; color: #2c3e50; line-height: 1.5; margin-bottom: 12px;">
-    Практическая реализация высокодоступного отказоустойчивого кластера СУБД для 1С:Предприятие с&nbsp;акцентом на&nbsp;Linux, исключение лишних прокси-узлов и&nbsp;инженерный подход к&nbsp;SRE-администрированию.
-  </div>
-  <div style="font-size: 13.5px; color: #4b5563; line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-    <div><strong>Серия публикаций:</strong> <a href="https://infostart.ru/1c/articles/2779597/" target="_blank" style="color: #0066cc; text-decoration: none;">1C:SRE-Suite для высоконагруженных систем на&nbsp;Linux</a></div>
-    <div><strong>Авторы проекта:</strong> Нинель и&nbsp;Николай Щербаковы</div>
-    <div><strong>Репозиторий проекта:</strong> <a href="https://github.com/NickScherbakov/1c-sre-suite" target="_blank" style="color: #0066cc; text-decoration: none; font-weight: bold;">NickScherbakov/1c-sre-suite</a></div>
-  </div>
+<div style="font-size: 22px; font-weight: bold; color: #0066cc; line-height: 1.35; margin-bottom: 8px;">1C:SRE-Suite &mdash; разворачиваем отказоустойчивый кластер PostgreSQL на&nbsp;базе Patroni и&nbsp;etcd с&nbsp;помощью Ansible без HAProxy</div>
+
+<div style="font-size: 15px; color: #2c3e50; line-height: 1.5; margin-bottom: 12px;">Практическая реализация высокодоступного отказоустойчивого кластера СУБД для 1С:Предприятие с&nbsp;акцентом на&nbsp;Linux, исключение лишних прокси-узлов и&nbsp;инженерный подход к&nbsp;SRE-администрированию.</div>
+
+<div style="font-size: 13.5px; color: #4b5563; line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+<div><strong>Серия публикаций:</strong> <a href="https://infostart.ru/1c/articles/2779597/" style="color: #0066cc; text-decoration: none;" target="_blank">1C:SRE-Suite для высоконагруженных систем на&nbsp;Linux</a></div>
+
+<div><strong>Авторы проекта:</strong> Нинель и&nbsp;Николай Щербаковы</div>
+
+<div><strong>Репозиторий проекта:</strong> <a href="https://github.com/NickScherbakov/1c-sre-suite" style="color: #0066cc; text-decoration: none; font-weight: bold;" target="_blank">NickScherbakov/1c-sre-suite</a></div>
+</div>
 </div>
 
-<!-- Блок оглавления -->
 <div style="border: 1px solid #dbe2ea; border-radius: 8px; padding: 18px 22px; background-color: #ffffff; margin-bottom: 30px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-  <div style="font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #111827;">Оглавление:</div>
-  <ol style="margin: 0; padding-left: 22px; line-height: 1.85; font-size: 14.5px;">
-    <li><a href="#section-1" style="color: #0066cc; text-decoration: none;">Почему мы отказываемся от схемы с HAProxy</a></li>
-    <li><a href="#section-2" style="color: #0066cc; text-decoration: none;">Решение: виртуальный IP-адрес и vip-manager от CYBERTEC</a></li>
-    <li><a href="#section-3" style="color: #0066cc; text-decoration: none;">Обзор структуры Ansible-модуля развертывания</a></li>
-    <li><a href="#section-4" style="color: #0066cc; text-decoration: none;">Практическое руководство по запуску</a></li>
-    <li><a href="#section-5" style="color: #0066cc; text-decoration: none;">Развитие инфраструктурного модуля</a></li>
-    <li><a href="#section-6" style="color: #0066cc; text-decoration: none;">Предыдущие материалы цикла</a></li>
-  </ol>
+<div style="font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #111827;">Оглавление:</div>
+
+<ol style="margin: 0; padding-left: 22px; line-height: 1.85; font-size: 14.5px;">
+	<li><a href="#section-1" style="color: #0066cc; text-decoration: none;">Почему мы отказываемся от схемы с HAProxy</a></li>
+	<li><a href="#section-2" style="color: #0066cc; text-decoration: none;">Решение: виртуальный IP-адрес и vip-manager от CYBERTEC</a></li>
+	<li><a href="#section-3" style="color: #0066cc; text-decoration: none;">Обзор структуры Ansible-модуля развертывания</a></li>
+	<li><a href="#section-4" style="color: #0066cc; text-decoration: none;">Практическое руководство по запуску</a></li>
+	<li><a href="#section-5" style="color: #0066cc; text-decoration: none;">Развитие инфраструктурного модуля</a></li>
+	<li><a href="#section-6" style="color: #0066cc; text-decoration: none;">Предыдущие материалы цикла</a></li>
+</ol>
 </div>
 
-<!-- Вводный текст -->
 <p>В&nbsp;предыдущих частях нашего цикла публикаций мы подробно разобрали автоматизацию сборки приложений, развертывание сквозного CI/CD конвейера и&nbsp;безопасное потоковое маскирование баз данных для сред разработки. Все эти шаги позволяют исключить человеческий фактор на&nbsp;этапе подготовки и&nbsp;доставки кода.</p>
 
 <p>Однако наивысший приоритет в&nbsp;борьбе за&nbsp;показатель доступности систем 99,9% имеет надежность самого уровня хранения данных. Любой непредвиденный сбой на&nbsp;стороне СУБД способен мгновенно парализовать работу сотен пользователей и&nbsp;привести к&nbsp;потере транзакций.</p>
 
+<p style="background: #f7faf7; border-left: 4px solid #2e7d32; border-radius: 4px; padding: 12px 16px; font-size: 14px; color: #1b3a1e;"><strong>Важно:</strong> все механизмы, описанные в&nbsp;статье, действуют исключительно на&nbsp;уровне целого экземпляра СУБД (физическая потоковая репликация PostgreSQL, штатный механизм <code>pg_rewind</code>, сетевой virtual&nbsp;IP) и&nbsp;являются стандартной, документированной функциональностью PostgreSQL и&nbsp;официально рекомендуемыми параметрами для 1С. Материал не&nbsp;выполняет прямых SQL-обращений к&nbsp;таблицам информационной базы 1С, не&nbsp;изменяет поведение платформы и&nbsp;не&nbsp;подменяет регламентные процедуры платформы SQL-скриптами &mdash; вся работа с&nbsp;объектами конфигурации по-прежнему выполняется исключительно средствами сервера 1С:Предприятие.</p>
+
 <p>В&nbsp;четвертой части нашей серии мы перейдем к&nbsp;автоматизации развертывания отказоустойчивой СУБД. Мы детально разберем структуру нашего Ansible-плейбука для автоматического создания трехнодового высокодоступного кластера PostgreSQL под управлением <code>Patroni</code> и&nbsp;<code>etcd</code>, а&nbsp;также покажем, как избавиться от&nbsp;лишнего и&nbsp;ненадежного звена в&nbsp;виде <code>HAProxy</code> с&nbsp;помощью утилиты <code>vip-manager</code>.</p>
 
-<!-- Раздел 1 -->
-<h2 id="section-1" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
-  <span style="color: #111827; font-weight: bold;">❌ Архитектурный выбор:</span> 
-  <span style="color: #0066cc; font-weight: bold;">почему мы отказываемся от схемы с HAProxy</span>
-</h2>
+<h2 id="section-1" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">Архитектурный выбор:</span> <span style="color: #0066cc; font-weight: bold;">почему мы отказываемся от схемы с HAProxy</span></h2>
 
 <p>Классическая и&nbsp;наиболее распространенная схема построения высокой доступности PostgreSQL, рекомендуемая во&nbsp;многих учебных материалах, включает в&nbsp;себя три ключевых компонента: СУБД с&nbsp;агентами <code>Patroni</code>, распределенный реестр <code>etcd</code> и&nbsp;балансировщик <code>HAProxy</code> в&nbsp;качестве точки входа.</p>
 
@@ -51,104 +49,95 @@
 <p>Данная схема имеет два фундаментальных недостатка в&nbsp;контексте эксплуатации систем &laquo;1С:Предприятие&raquo;:</p>
 
 <ul style="line-height: 1.7; font-size: 14.5px;">
-  <li><strong>Снижение производительности:</strong> рабочие процессы 1С не&nbsp;поддерживают разделение транзакционного трафика на&nbsp;чтение и&nbsp;запись на&nbsp;уровне платформы. Весь поток запросов всегда идет на&nbsp;мастер-ноду. В&nbsp;этих условиях <code>HAProxy</code> выполняет роль простого переключателя трафика, который, по&nbsp;результатам тестов в&nbsp;высоконагруженных средах, вносит дополнительную задержку на&nbsp;сетевом уровне в&nbsp;размере от&nbsp;1% до&nbsp;10% в&nbsp;зависимости от&nbsp;характеристик оборудования.</li>
-  <li><strong>Дополнительная точка отказа:</strong> сам узел балансировщика <code>HAProxy</code> становится критическим элементом инфраструктуры. Для обеспечения его отказоустойчивости приходится разворачивать еще одну пару серверов с&nbsp;утилитами <code>Keepalived</code> и&nbsp;виртуальным IP-адресом, что лавинообразно увеличивает сложность администрирования и&nbsp;вероятность ошибок при эксплуатации.</li>
+	<li><strong>Снижение производительности:</strong> рабочие процессы 1С не&nbsp;поддерживают разделение транзакционного трафика на&nbsp;чтение и&nbsp;запись на&nbsp;уровне платформы. Весь поток запросов всегда идет на&nbsp;мастер-ноду. В&nbsp;этих условиях <code>HAProxy</code> выполняет роль простого переключателя трафика, который, по&nbsp;результатам тестов в&nbsp;высоконагруженных средах, вносит дополнительную задержку на&nbsp;сетевом уровне в&nbsp;размере от&nbsp;1% до&nbsp;10% в&nbsp;зависимости от&nbsp;характеристик оборудования.</li>
+	<li><strong>Дополнительная точка отказа:</strong> сам узел балансировщика <code>HAProxy</code> становится критическим элементом инфраструктуры. Для обеспечения его отказоустойчивости приходится разворачивать еще одну пару серверов с&nbsp;утилитами <code>Keepalived</code> и&nbsp;виртуальным IP-адресом, что лавинообразно увеличивает сложность администрирования и&nbsp;вероятность ошибок при эксплуатации.</li>
 </ul>
 
 <p>Мы предлагаем использовать более элегантное и&nbsp;производительное инженерное решение: исключить <code>HAProxy</code> из&nbsp;цепочки прохождения запросов и&nbsp;организовать прямую маршрутизацию трафика.</p>
 
-<!-- Раздел 2 -->
-<h2 id="section-2" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
-  <span style="color: #111827; font-weight: bold;">🎯 Инженерное решение:</span> 
-  <span style="color: #0066cc; font-weight: bold;">виртуальный IP-адрес и vip-manager от CYBERTEC</span>
-</h2>
+<h2 id="section-2" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🎯 Инженерное решение:</span> <span style="color: #0066cc; font-weight: bold;">виртуальный IP-адрес и vip-manager от CYBERTEC</span></h2>
 
 <p>Для создания единой точки входа без использования внешних балансировщиков мы интегрировали в&nbsp;наш SRE-пакет утилиту <strong>vip-manager</strong> (мы используем современную версию <code>v5.0.0</code>, переведенную на&nbsp;<code>etcd v3 API</code>).</p>
 
 <p>Принцип работы этой схемы предельно прост и&nbsp;надежен:</p>
 
 <ol style="line-height: 1.8; font-size: 14.5px;">
-  <li>Для кластера СУБД выделяется один свободный виртуальный IP-адрес (VIP) в&nbsp;локальной сети.</li>
-  <li>Демон <code>vip-manager</code> запускается на&nbsp;каждом сервере баз данных в&nbsp;кластере и&nbsp;непрерывно опрашивает распределенное хранилище <code>etcd</code> по&nbsp;ключу <code>/db/cluster-1c/leader</code>.</li>
-  <li>Узел, который в&nbsp;данный момент признан <code>etcd</code> активным лидером Patroni, получает сигнал от&nbsp;локального <code>vip-manager</code>, и&nbsp;утилита мгновенно вешает виртуальный IP-адрес на&nbsp;свой сетевой интерфейс.</li>
-  <li>В&nbsp;случае аварии лидера и&nbsp;переключения роли мастера на&nbsp;другой узел, <code>vip-manager</code> на&nbsp;упавшем сервере мгновенно удаляет виртуальный адрес со&nbsp;своего интерфейса (в&nbsp;версии <code>v5.0.0</code> это происходит автоматически даже при полной потере связи с&nbsp;DCS), а&nbsp;на&nbsp;новом мастере локальный демон <code>vip-manager</code> поднимает этот&nbsp;же IP-адрес на&nbsp;сетевом интерфейсе.</li>
-  <li>Сервер приложений 1С всегда подключается к&nbsp;базе данных по&nbsp;единому виртуальному IP-адресу, не&nbsp;замечая физических переключений серверов &laquo;под капотом&raquo; СУБД.</li>
+	<li>Для кластера СУБД выделяется один свободный виртуальный IP-адрес (VIP) в&nbsp;локальной сети.</li>
+	<li>Демон <code>vip-manager</code> запускается на&nbsp;каждом сервере баз данных в&nbsp;кластере и&nbsp;непрерывно опрашивает распределенное хранилище <code>etcd</code> по&nbsp;ключу <code>/db/cluster-1c/leader</code>.</li>
+	<li>Узел, который в&nbsp;данный момент признан <code>etcd</code> активным лидером Patroni, получает сигнал от&nbsp;локального <code>vip-manager</code>, и&nbsp;утилита мгновенно вешает виртуальный IP-адрес на&nbsp;свой сетевой интерфейс.</li>
+	<li>В&nbsp;случае аварии лидера и&nbsp;переключения роли мастера на&nbsp;другой узел, <code>vip-manager</code> на&nbsp;упавшем сервере мгновенно удаляет виртуальный адрес со&nbsp;своего интерфейса (в&nbsp;версии <code>v5.0.0</code> это происходит автоматически даже при полной потере связи с&nbsp;DCS), а&nbsp;на&nbsp;новом мастере локальный демон <code>vip-manager</code> поднимает этот&nbsp;же IP-адрес на&nbsp;сетевом интерфейсе.</li>
+	<li>Сервер приложений 1С всегда подключается к&nbsp;базе данных по&nbsp;единому виртуальному IP-адресу, не&nbsp;замечая физических переключений серверов &laquo;под капотом&raquo; СУБД.</li>
 </ol>
 
 <p>Такой подход гарантирует прямое сетевое соединение с&nbsp;активным сервером СУБД с&nbsp;нулевыми задержками на&nbsp;проксирование.</p>
 
-<!-- Раздел 3 -->
-<h2 id="section-3" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
-  <span style="color: #111827; font-weight: bold;">📂 Структура автоматизации:</span> 
-  <span style="color: #0066cc; font-weight: bold;">обзор Ansible-модуля развертывания</span>
-</h2>
+<h2 id="section-3" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">📂 Структура автоматизации:</span> <span style="color: #0066cc; font-weight: bold;">обзор Ansible-модуля развертывания</span></h2>
 
 <p>Наш готовый модуль развертывания полностью автоматизирует процесс установки и&nbsp;конфигурации всех элементов ОУК на&nbsp;операционных системах Linux (включая Astra Linux, Ред ОС и&nbsp;Ubuntu). Вся логика плейбука разделена на&nbsp;детерминированные стадии:</p>
 
 <h3 style="font-size: 16.5px; color: #0066cc; margin-top: 24px; margin-bottom: 8px;">1. Подготовка операционной системы</h3>
+
 <p>Для корректной работы виртуального IP-адреса на&nbsp;всех серверах СУБД необходимо разрешить демонам связываться с&nbsp;адресами, которые физически еще не&nbsp;подняты на&nbsp;локальных сетевых картах. Плейбук автоматически прописывает параметр ядра <code>net.ipv4.ip_nonlocal_bind = 1</code> в&nbsp;системный файл <code>/etc/sysctl.conf</code> и&nbsp;немедленно применяет изменения. Также на&nbsp;этом этапе устанавливаются базовые системные утилиты, включая транслятор сетевых имен, менеджер пакетов <code>pip</code> и&nbsp;драйверы СУБД.</p>
 
 <h3 style="font-size: 16.5px; color: #0066cc; margin-top: 24px; margin-bottom: 8px;">2. Развертывание кластера etcd</h3>
+
 <p>Плейбук устанавливает службу <code>etcd</code>, генерирует уникальные токены инициализации для каждого сервера и&nbsp;настраивает конфигурационные файлы. Настройки <code>etcd</code> жестко выверены: интервал отправки сигналов активности (heartbeat) зафиксирован на&nbsp;уровне <code>1000&nbsp;мс</code>, а&nbsp;таймаут выборов лидера (election timeout) равен <code>5000&nbsp;мс</code>. Это исключает ложные срабатывания кластера при кратковременных сетевых колебаниях.</p>
 
 <h3 style="font-size: 16.5px; color: #0066cc; margin-top: 24px; margin-bottom: 8px;">3. Установка СУБД и&nbsp;инициализация Patroni</h3>
+
 <p>Наш скрипт останавливает и&nbsp;полностью отключает стандартную системную службу PostgreSQL (например, <code>postgrespro-1c-16</code>), так как отныне управлением жизненным циклом процессов СУБД будет заниматься исключительно агент <code>Patroni</code>.</p>
 
 <p>В&nbsp;конфигурационный шаблон Patroni автоматически закладываются параметры, критически важные для высоконагруженных баз данных 1С:</p>
+
 <ul style="line-height: 1.7; font-size: 14.5px;">
-  <li><code>max_connections: 250</code> &mdash; для обеспечения бесперебойной работы большого пула фоновых заданий и&nbsp;сеансов пользователей.</li>
-  <li><code>max_locks_per_transaction: 256</code> &mdash; для исключения переполнения таблицы блокировок при проведении тяжелых документов.</li>
-  <li><code>use_pg_rewind: true</code> &mdash; для автоматического восстановления согласованности данных при возврате упавшего мастера в&nbsp;кластер в&nbsp;роли реплики.</li>
+	<li><code>max_connections: 250</code> &mdash; для обеспечения бесперебойной работы большого пула фоновых заданий и&nbsp;сеансов пользователей.</li>
+	<li><code>max_locks_per_transaction: 256</code> &mdash; для исключения переполнения таблицы блокировок при проведении тяжелых документов.</li>
+	<li><code>use_pg_rewind: true</code> &mdash; для автоматического восстановления согласованности данных при возврате упавшего мастера в&nbsp;кластер в&nbsp;роли реплики.</li>
 </ul>
 
-<p>На&nbsp;уровне СУБД автоматически создаются три выделенные учетные записи с&nbsp;четким разграничением прав: <code>patroni_superuser</code> (администратор), <code>patroni_replication</code> (пользователь репликации) и&nbsp;<code>patroni_rewind</code> (пользователь с&nbsp;точечными правами на&nbsp;системные функции для автоматического отката расходящихся транзакций).</p>
+<p>На&nbsp;уровне СУБД автоматически создаются три выделенные учетные записи с&nbsp;четким разграничением прав: <code>patroni_superuser</code> (администратор), <code>patroni_replication</code> (пользователь репликации) и&nbsp;<code>patroni_rewind</code> (пользователь с&nbsp;точечными правами на&nbsp;системные функции для автоматического отката расходящихся транзакций). Все три учетные записи используются исключительно служебными процессами <code>Patroni</code> для оркестрации кластера (запуск, остановка, переключение ролей, ресинхронизация реплик) &mdash; ни&nbsp;одна из&nbsp;них не&nbsp;применяется для чтения или изменения данных информационной базы 1С, эта область по-прежнему остается зоной ответственности платформы.</p>
 
 <h3 style="font-size: 16.5px; color: #0066cc; margin-top: 24px; margin-bottom: 8px;">4. Запуск vip-manager и&nbsp;настройка автозапуска</h3>
+
 <p>Ansible скачивает официальный релиз <code>vip-manager</code>, устанавливает его в&nbsp;систему, генерирует конфигурационный файл с&nbsp;указанием целевого виртуального IP-адреса и&nbsp;маски подсети, связывает его с&nbsp;ключами <code>etcd</code> и&nbsp;регистрирует службу в&nbsp;менеджере <code>systemd</code> с&nbsp;настроенным автозапуском.</p>
 
-<!-- Раздел 4 -->
-<h2 id="section-4" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
-  <span style="color: #111827; font-weight: bold;">🛠️ Quick Start:</span> 
-  <span style="color: #0066cc; font-weight: bold;">практическое руководство по запуску</span>
-</h2>
+<h2 id="section-4" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🛠 Quick Start:</span> <span style="color: #0066cc; font-weight: bold;">практическое руководство по запуску</span></h2>
 
 <p>Весь описанный инфраструктурный код уже оформлен в&nbsp;виде готового плейбука и&nbsp;шаблонов в&nbsp;файле <code>ansible-patroni-ha.txt</code> в&nbsp;нашем репозитории. Чтобы запустить автоматическое развертывание в&nbsp;своей сети, выполните три простых шага:</p>
 
 <ol style="line-height: 1.8; font-size: 14.5px;">
-  <li>Подготовьте три виртуальные или физические машины с&nbsp;установленной ОС Linux и&nbsp;настройте SSH-доступ по&nbsp;ключам.</li>
-  <li>Отредактируйте файл инвентаря <code>hosts.ini</code>, указав IP-адреса ваших серверов, имя сетевого интерфейса и&nbsp;целевой виртуальный IP-адрес, который станет точкой входа для 1С.</li>
-  <li>Запустите выполнение плейбука:</li>
+	<li>Подготовьте три виртуальные или физические машины с&nbsp;установленной ОС Linux и&nbsp;настройте SSH-доступ по&nbsp;ключам.</li>
+	<li>Отредактируйте файл инвентаря <code>hosts.ini</code>, указав IP-адреса ваших серверов, имя сетевого интерфейса и&nbsp;целевой виртуальный IP-адрес, который станет точкой входа для 1С.</li>
+	<li>Запустите выполнение плейбука:</li>
 </ol>
 
 <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin: 16px 0; overflow-x: auto;">
-  <pre style="margin: 0; font-family: 'SFMono-Regular', Consolas, Monaco, monospace; font-size: 13.5px; color: #1e293b;"><code class="language-bash">ansible-playbook -i hosts.ini deploy-cluster.yml</code></pre>
+<pre style="margin: 0; font-family: 'SFMono-Regular', Consolas, Monaco, monospace; font-size: 13.5px; color: #1e293b;">
+<code class="language-bash">ansible-playbook -i hosts.ini deploy-cluster.yml</code></pre>
 </div>
 
 <p>Ansible последовательно пройдет по&nbsp;всем узлам, настроит параметры ядра, соберет кластер <code>etcd</code>, инициализирует <code>Patroni</code>, настроит пользователей базы данных и&nbsp;запустит <code>vip-manager</code>. На&nbsp;выходе вы получите отказоустойчивую среду хранения данных &laquo;под ключ&raquo;.</p>
 
-<!-- Раздел 5 -->
-<h2 id="section-5" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;">
-  <span style="color: #111827; font-weight: bold;">🤝 Roadmap:</span> 
-  <span style="color: #0066cc; font-weight: bold;">развитие инфраструктурного модуля</span>
-</h2>
+<h2 id="section-5" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🤝 Roadmap:</span> <span style="color: #0066cc; font-weight: bold;">развитие инфраструктурного модуля</span></h2>
 
 <p>Развертывание кластера по&nbsp;декларативным сценариям &mdash; это важная часть концепции Infrastructure as Code (IaC) нашего открытого проекта <strong>1C:SRE-Suite</strong>.</p>
 
 <p>В&nbsp;наших ближайших планах по&nbsp;развитию этого модуля:</p>
+
 <ul style="line-height: 1.7; font-size: 14.5px;">
-  <li>Интеграция автоматического резервного копирования на&nbsp;базе утилиты <code>pg_probackup</code> с&nbsp;хранением архивов в&nbsp;S3-совместимых облачных хранилищах.</li>
-  <li>Добавление сценариев тонкой настройки параметров ядра Linux (оптимизация работы с&nbsp;виртуальной памятью, отключение Transparent Huge Pages) непосредственно в&nbsp;процессе развертывания СУБД.</li>
-  <li>Разработка плейбуков автоматического обновления версий СУБД PostgreSQL в&nbsp;кластере с&nbsp;нулевым простоем системы (Rolling Updates).</li>
+	<li>Интеграция автоматического резервного копирования на&nbsp;базе утилиты <code>pg_probackup</code> с&nbsp;хранением архивов в&nbsp;S3-совместимых облачных хранилищах.</li>
+	<li>Добавление сценариев оптимизации операционной системы Linux на&nbsp;серверах СУБД (настройка параметров работы с&nbsp;виртуальной памятью, отключение Transparent Huge Pages) &mdash; речь идет исключительно о&nbsp;штатных параметрах ядра ОС, а&nbsp;не&nbsp;о&nbsp;внутренних объектах СУБД.</li>
+	<li>Разработка плейбуков автоматического обновления версий СУБД PostgreSQL в&nbsp;кластере с&nbsp;нулевым простоем системы (Rolling Updates).</li>
 </ul>
 
-<p>Вы можете найти готовый сборочный файл <code>ansible-patroni-ha.txt</code> со&nbsp;всеми конфигурациями в&nbsp;репозитории проекта. Приглашаем вас тестировать решение на&nbsp;своих стендах, делиться результатами, открывать новые Issue и&nbsp;присылать свои пул-реквесты в&nbsp;наш репозиторий <a href="https://github.com/NickScherbakov/1c-sre-suite" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;"><strong>NickScherbakov/1c-sre-suite</strong></a>!</p>
+<p>Вы можете найти готовый сборочный файл <code>ansible-patroni-ha.txt</code> со&nbsp;всеми конфигурациями в&nbsp;репозитории проекта. Приглашаем вас тестировать решение на&nbsp;своих стендах, делиться результатами, открывать новые Issue и&nbsp;присылать свои пул-реквесты в&nbsp;наш репозиторий <a href="https://github.com/NickScherbakov/1c-sre-suite" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank"><strong>NickScherbakov/1c-sre-suite</strong></a>!</p>
 
-<!-- Раздел 6 -->
 <div id="section-6" style="margin-top: 40px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-  <p style="font-style: italic; color: #4b5563;">Если вы хотите подробнее ознакомиться с&nbsp;другими архитектурными решениями нашего проекта, рекомендуем прочитать наши предыдущие материалы:</p>
-  <ul style="line-height: 1.8; font-size: 14.5px;">
-    <li><a href="https://infostart.ru/1c/articles/2779597/" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;">1C:SRE-Suite: переводим управление инфраструктурой 1С на&nbsp;Linux в&nbsp;декларативный формат</a></li>
-    <li><a href="https://infostart.ru/1c/articles/2777908/" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;">Как обеспечить 99,9% доступности кластера 1С на&nbsp;Linux: DevOps, CI/CD и&nbsp;контроль памяти rphost</a></li>
-    <li><a href="https://infostart.ru/1c/articles/2772158/" target="_blank" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;">Неубиваемый CI/CD для 1С на&nbsp;Linux: от&nbsp;коммита до&nbsp;живого curl за&nbsp;5 минут без ложных &laquo;успехов&raquo;</a></li>
-  </ul>
+<p style="font-style: italic; color: #4b5563;">Если вы хотите подробнее ознакомиться с&nbsp;другими архитектурными решениями нашего проекта, рекомендуем прочитать наши предыдущие материалы:</p>
+
+<ul style="line-height: 1.8; font-size: 14.5px;">
+	<li><a href="https://infostart.ru/1c/articles/2779597/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank">1C:SRE-Suite: переводим управление инфраструктурой 1С на&nbsp;Linux в&nbsp;декларативный формат</a></li>
+	<li><a href="https://infostart.ru/1c/articles/2777908/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank">Как обеспечить 99,9% доступности кластера 1С на&nbsp;Linux: DevOps, CI/CD и&nbsp;контроль памяти rphost</a></li>
+	<li><a href="https://infostart.ru/1c/articles/2772158/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank">Неубиваемый CI/CD для 1С на&nbsp;Linux: от&nbsp;коммита до&nbsp;живого curl за&nbsp;5 минут без ложных &laquo;успехов&raquo;</a></li>
+</ul>
 </div>

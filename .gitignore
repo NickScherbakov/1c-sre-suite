@@ -22,3 +22,6 @@ npm-debug.log*
 .bin/
 /build/
 bin/
+
+# Ansible Vault: реальные секреты не коммитим, только *.example
+ansible/patroni-ha/group_vars/db_nodes/vault.yml
