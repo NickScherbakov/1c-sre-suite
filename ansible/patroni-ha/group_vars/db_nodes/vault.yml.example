@@ -1,0 +1,18 @@
+# Шаблон секретов для роли patroni-ha.
+#
+# Как использовать:
+#   1. Скопируйте этот файл рядом, без суффикса .example:
+#        cp vault.yml.example vault.yml
+#   2. Подставьте свои пароли вместо примеров ниже.
+#   3. Зашифруйте файл перед коммитом (или не коммитьте его вовсе —
+#      добавьте group_vars/db_nodes/vault.yml в свой .gitignore):
+#        ansible-vault encrypt group_vars/db_nodes/vault.yml
+#   4. Запускайте плейбук с ключом --ask-vault-pass (или --vault-password-file):
+#        ansible-playbook -i hosts.ini deploy-cluster.yml --ask-vault-pass
+#
+# Этот файл (vault.yml.example) хранится в репозитории НЕ зашифрованным
+# и содержит только примеры значений — реальные пароли в него класть нельзя.
+
+patroni_superuser_password: "ChangeMe-SuperuserPassword"
+patroni_replication_password: "ChangeMe-ReplicationPassword"
+patroni_rewind_password: "ChangeMe-RewindPassword"

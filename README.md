@@ -55,5 +55,16 @@ sudo ./install_admincluster.sh
 sudo systemctl enable --now admincluster-monitor@prod.timer
 ```
 
+### 4. Развёртывание отказоустойчивого кластера PostgreSQL (Patroni + etcd + vip-manager)
+Подробное описание архитектуры — в [четвёртой части цикла](https://infostart.ru/1c/articles/2783161/). Аутентификация к серверам — по SSH-ключам; пароли самой СУБД задаются через Ansible Vault и в открытом виде в репозитории не хранятся:
+```bash
+cd ansible/patroni-ha
+cp group_vars/db_nodes/vault.yml.example group_vars/db_nodes/vault.yml
+# отредактируйте vault.yml, подставив свои пароли, затем:
+ansible-vault encrypt group_vars/db_nodes/vault.yml
+# отредактируйте hosts.ini под свою сеть (IP-адреса узлов и VIP, pg_hba_subnet), затем:
+ansible-playbook -i hosts.ini deploy-cluster.yml --ask-vault-pass
+```
+
 ---
 Разработано совместно в рамках проекта «1С:SRE-Контур». Свободная лицензия MIT.

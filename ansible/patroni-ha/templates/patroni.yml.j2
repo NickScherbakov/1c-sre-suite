@@ -46,8 +46,8 @@ bootstrap:
     - data-checksums
 
   pg_hba:
-    - host all all 0.0.0.0/0 md5
-    - host replication patroni_replication 0.0.0.0/0 md5
+    - host all all {{ pg_hba_subnet }} md5
+    - host replication patroni_replication {{ pg_hba_subnet }} md5
 
 postgresql:
   listen: 0.0.0.0:5432
@@ -57,13 +57,13 @@ postgresql:
   authentication:
     superuser:
       username: patroni_superuser
-      password: SuperuserSecretPassword
+      password: "{{ patroni_superuser_password }}"
     replication:
       username: patroni_replication
-      password: ReplicationSecretPassword
+      password: "{{ patroni_replication_password }}"
     rewind:
       username: patroni_rewind
-      password: RewindSecretPassword
+      password: "{{ patroni_rewind_password }}"
 
 tags:
   clonefrom: true
