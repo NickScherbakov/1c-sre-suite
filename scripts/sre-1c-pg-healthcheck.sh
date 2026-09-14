@@ -17,10 +17,11 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 GENERATE_FIX=false
-FIX_FILE="/tmp/sre-healthcheck-fix.sh"
+FIX_FILE=""
 
 if [[ "${1:-}" == "--generate-fix" ]]; then
     GENERATE_FIX=true
+    FIX_FILE="$(mktemp /tmp/sre-healthcheck-fix.XXXXXX.sh)"
     cat << 'EOF' > "$FIX_FILE"
 #!/usr/bin/env bash
 # 1C:SRE-Suite Auto-Remediation Script
@@ -60,7 +61,7 @@ log_fail() {
 }
 
 add_fix_command() {
-    if $GENERATE_FIX && [[ -n "${1:-}" ]]; then
+    if [[ "$GENERATE_FIX" == true ]] && [[ -n "${1:-}" ]]; then
         echo "$1" >> "$FIX_FILE"
     fi
 }
@@ -134,7 +135,8 @@ check_kernel_and_vm() {
     if [[ "$overcommit" -eq 2 ]]; then
         log_ok "vm.overcommit_memory = 2 (Strict Don't Overcommit — Safe for dedicated DB)"
     else
-        log_info "vm.overcommit_memory = $overcommit (Heuristic overcommit — Verify swap size if running 1C)"
+        log_warn "vm.overcommit_memory = $overcommit (Recommended 2 for dedicated PostgreSQL/1C nodes)" \
+                 "Set vm.overcommit_memory=2 in /etc/sysctl.d/99-1c-postgresql.conf"
     fi
 
     # 5. net.ipv4.ip_nonlocal_bind (Критично для vip-manager)
@@ -171,7 +173,7 @@ check_postgres_patroni() {
         local http_code
         http_code=$(curl -s --connect-timeout 2 --max-time 3 -o /dev/null -w "%{http_code}" "$patroni_url/cluster" 2>/dev/null || echo "000")
 
-        if [[ "$http_code" -eq 200 ]]; then
+        if [[ "$http_code" =~ ^[0-9]+$ ]] && [[ "$http_code" -eq 200 ]]; then
             local role_raw role_clean
             role_raw=$(curl -s --connect-timeout 2 --max-time 3 "$patroni_url/patroni" 2>/dev/null || echo "")
             role_clean=$(echo "$role_raw" | awk -F'"role":"' '{print $2}' | awk -F'"' '{print $1}' | tr '[:lower:]' '[:upper:]')
@@ -204,12 +206,12 @@ check_postgres_patroni() {
             local active_locks
             active_locks=$($psql_cmd -c "SELECT count(*) FROM pg_locks;" 2>/dev/null || echo "0")
             if [[ "$active_locks" =~ ^[0-9]+$ ]] && [[ "$active_locks" -gt 0 ]]; then
-                local utilization=$(( active_locks * 100 / locks ))
-                if [[ "$utilization" -ge 70 ]]; then
-                    log_warn "Active locks count: $active_locks / $locks ($utilization% utilized)" \
-                             "High lock density detected; consider increasing max_locks_per_transaction"
+                local lock_density=$(( active_locks * 100 / locks ))
+                if [[ "$lock_density" -ge 70 ]]; then
+                    log_warn "Lock heuristic: $active_locks active locks, max_locks_per_transaction=$locks (density ~${lock_density}%)" \
+                             "High lock pressure detected; consider increasing max_locks_per_transaction"
                 else
-                    log_ok "Active locks count: $active_locks / $locks ($utilization% utilized)"
+                    log_ok "Lock heuristic: $active_locks active locks, max_locks_per_transaction=$locks (density ~${lock_density}%)"
                 fi
             fi
         elif [[ "$locks" =~ ^[0-9]+$ ]] && [[ "$locks" -gt 0 ]]; then
@@ -274,7 +276,7 @@ check_1c_cluster() {
                     fi
                 fi
 
-                if $is_leaking; then
+                if [[ "$is_leaking" == true ]]; then
                     log_warn "PID $pid (rphost): RSS = ${rss_gb} GB, SWAP = ${swap_gb} GB (Active swapping!)" \
                              "Candidate for soft rotation via admincluster_run.sh / RAS API"
                 else
@@ -291,7 +293,7 @@ summary() {
     echo -e "${BOLD}${BLUE}================================================================================${NC}"
     echo -e "${BOLD} SUMMARY:${NC} ${GREEN}${OK_COUNT} OK${NC} | ${YELLOW}${WARN_COUNT} WARNINGS${NC} | ${RED}${FAIL_COUNT} FAILURES${NC}"
 
-    if $GENERATE_FIX; then
+    if [[ "$GENERATE_FIX" == true ]]; then
         echo -e "${BOLD}${GREEN} Auto-fix script generated:${NC} $FIX_FILE"
         echo -e " Review and run: '${BOLD}sudo bash $FIX_FILE${NC}'"
     else
