@@ -12,6 +12,10 @@
 
 <a href="https://infostart.ru/public/2783161/"><img src="https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg" alt="Infostart" style="vertical-align: middle;"></a> - Четвертая часть
 
+<br>
+
+<a href="https://infostart.ru/public/2790159/"><img src="https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg" alt="Infostart" style="vertical-align: middle;"></a> - Пятая часть
+
 
 
 # DevOps & Stability Enterprise Suite for 1C on Linux
