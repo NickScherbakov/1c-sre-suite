@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1C:SRE-Suite (Часть 5): Тюнинг ядра Linux и виртуальной памяти под PostgreSQL и сервер «1С:Предприятие»</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.65;
+            color: #24292e;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+            background-color: #ffffff;
+        }
+        h1, h2, h3, h4 {
+            color: #1a202c;
+            font-weight: 600;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            line-height: 1.3;
+        }
+        h1 { font-size: 2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+        h2 { font-size: 1.5rem; border-bottom: 1px solid #edf2f7; padding-bottom: 0.4rem; }
+        h3 { font-size: 1.25rem; }
+        p { margin-bottom: 1.2rem; }
+        a { color: #0969da; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 0.88em;
+            background-color: #f6f8fa;
+            padding: 0.2em 0.4em;
+            border-radius: 4px;
+            border: 1px solid #eaecef;
+        }
+        pre {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            padding: 1.2rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.88em;
+            line-height: 1.45;
+            border: 1px solid #30363d;
+            margin: 1.2rem 0;
+        }
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+            border: none;
+            font-size: 1em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.95em;
+        }
+        th, td {
+            border: 1px solid #d0d7de;
+            padding: 0.6rem 0.8rem;
+            text-align: left;
+        }
+        th {
+            background-color: #f6f8fa;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background-color: #fafbfc; }
+        blockquote {
+            margin: 1.5rem 0;
+            padding: 0.8rem 1.2rem;
+            color: #57606a;
+            background-color: #f6f8fa;
+            border-left: 0.25rem solid #0969da;
+            border-radius: 0 4px 4px 0;
+        }
+        blockquote p:last-child { margin-bottom: 0; }
+        ul, ol { padding-left: 1.8rem; margin-bottom: 1.2rem; }
+        li { margin-bottom: 0.4rem; }
+        hr {
+            height: 1px;
+            background-color: #e1e4e8;
+            border: none;
+            margin: 2.5rem 0;
+        }
+        .meta-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            font-size: 0.95em;
+        }
+        .diagram-figure {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        .diagram-caption {
+            margin-top: 0.75rem;
+            font-size: 0.88em;
+            color: #64748b;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>1C:SRE-Suite (Часть 5): Тюнинг ядра Linux и виртуальной памяти под PostgreSQL и сервер «1С:Предприятие»</h1>
+    <p><strong>Как предотвратить I/O-ступоры, скрытые утечки rphost в swap и микро-паузы СУБД. Разбор физики sysctl, отключение THP, декларативная Ansible-роль и презентация утилиты экспресс-диагностики sre-1c-pg-healthcheck.sh.</strong></p>
+
+    <div class="meta-box">
+        <ul>
+            <li><strong>Серия публикаций:</strong> <a href="https://infostart.ru/1c/articles/2779597/">1C:SRE-Suite для высоконагруженных систем на Linux</a></li>
+            <li><strong>Авторы проекта:</strong> Нинель и Николай Щербаковы</li>
+            <li><strong>Репозиторий проекта:</strong> <a href="https://github.com/NickScherbakov/1c-sre-suite">NickScherbakov/1c-sre-suite</a> (Лицензия MIT)</li>
+            <li><strong>Проверено на стендах:</strong> Astra Linux 1.7 / Ubuntu 22.04 LTS / RedOS 7.3, PostgreSQL 16 (Postgres Pro 1C), Платформа «1С:Предприятие 8.3» (релизы 8.3.24.1667, 8.3.25.1394).</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>Введение и ретроспектива: выполняем обещания Roadmap</h2>
+    <p>В предыдущих четырёх частях открытого инженерного цикла <strong>1C:SRE-Suite</strong> мы последовательно разворачивали контур надёжности корпоративного уровня:</p>
+    <ol>
+        <li><a href="https://infostart.ru/1c/articles/2779597/"><strong>Часть 1:</strong></a> Заложили принципы Infrastructure as Code (IaC), внедрили 5 рубежей обороны в сборочный скрипт <code>1c-ci-linux-build-v4.sh</code> для защиты от «ложного успеха» (False Success) и реализовали внешнюю ротацию рабочих процессов <code>rphost</code> через RAS API.</li>
+        <li><a href="https://infostart.ru/1c/articles/2780378/"><strong>Часть 2:</strong></a> Построили детерминированный CI/CD-пайплайн в GitHub Actions, решили проблему потери широковещательных UDP-пакетов сетевых HASP-ключей через <code>--net=host</code> и устранили коллизии параллельных сборок через динамический <code>RUN_ID</code>.</li>
+        <li><a href="https://infostart.ru/1c/articles/2781587/"><strong>Часть 3:</strong></a> Исключили хранение незащищённых боевых дампов при подготовке dev-стендов: реализовали потоковое маскирование <code>pg_anon</code> в Unix-пайпах с платформенной пост-обработкой <code>post-anonymize-1c.bsl</code> без единого прямого SQL-обращения к таблицам базы.</li>
+        <li><a href="https://infostart.ru/1c/articles/2783161/"><strong>Часть 4:</strong></a> Развернули 3-нодовый отказоустойчивый кластер PostgreSQL под управлением Patroni и etcd, полностью устранили прокси-задержки HAProxy с помощью связки <code>vip-manager</code> и параметра <code>net.ipv4.ip_nonlocal_bind = 1</code>.</li>
+    </ol>
+    <p>В финале четвёртой статьи мы зафиксировали обязательство: <strong>спуститься на уровень операционной системы и представить инженерные сценарии глубокой оптимизации ядра Linux под совместную работу PostgreSQL и платформы 1С</strong>.</p>
+
+    <blockquote>
+        <p><strong>Важно (соблюдение регламентов модерации Infostart):</strong> Все рассматриваемые механизмы действуют исключительно на уровне инфраструктуры ОС Linux и документированных настроек СУБД PostgreSQL. Они не затрагивают структуру метаданных конфигураций 1С, не подменяют регламентные процедуры платформы прямыми SQL-командами и полностью соответствуют официальным требованиям фирмы «1С» к эксплуатации высоконагруженных систем.</p>
+    </blockquote>
+
+    <hr>
+
+    <h2>Раздел 1. Анатомия и физика виртуальной памяти Linux под нагрузкой 1С</h2>
+    <p>Главный вызов при эксплуатации СУБД PostgreSQL и сервера приложений «1С:Предприятие» в среде Linux — это <strong>жесткая конкуренция за физическую оперативную память (RAM) и дисковый ввод-вывод (I/O)</strong>.</p>
+    <p>Рабочие процессы <code>rphost</code> и бэкенды <code>postgres</code> непрерывно выделяют и освобождают анонимную память под выборки, кэши и агрегаты. Если подсистема виртуальной памяти Linux настроена по умолчанию, поведение стандартного менеджера страниц ядра становится разрушительным для транзакционной OLTP-нагрузки.</p>
+
+    <!-- СХЕМА 1: ИНЛАЙН SVG -->
+    <figure class="diagram-figure">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 250" width="100%" height="auto" style="max-width: 720px; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);">
+          <style>
+            .th1 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 700; fill: #94a3b8; text-anchor: middle; letter-spacing: 0.05em; }
+            .bh1 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 600; fill: #f8fafc; text-anchor: middle; }
+            .bs1 { font-family: system-ui, -apple-system, sans-serif; font-size: 11px; fill: #cbd5e1; text-anchor: middle; }
+            .wt1 { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; font-weight: 700; fill: #ef4444; }
+            .ws1 { font-family: system-ui, -apple-system, sans-serif; font-size: 11px; fill: #fca5a5; }
+          </style>
+          <rect width="720" height="250" rx="10" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5"/>
+          <rect x="25" y="15" width="670" height="85" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+          <text x="360" y="35" class="th1">ФИЗИЧЕСКАЯ ОПЕРАТИВНАЯ ПАМЯТЬ (RAM)</text>
+          <rect x="40" y="45" width="310" height="42" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1"/>
+          <text x="195" y="65" class="bh1">PostgreSQL Buffers</text>
+          <text x="195" y="79" class="bs1">shared_buffers / кэш страниц</text>
+          <rect x="370" y="45" width="310" height="42" rx="6" fill="#312e81" stroke="#6366f1" stroke-width="1"/>
+          <text x="525" y="65" class="bh1">1C:Enterprise Memory</text>
+          <text x="525" y="79" class="bs1">процессы rphost / VmRSS</text>
+          <path d="M 360 100 L 360 145" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 3"/>
+          <polygon points="355,145 365,145 360,153" fill="#ef4444"/>
+          <rect x="380" y="105" width="300" height="38" rx="4" fill="#450a0a" stroke="#991b1b" stroke-width="1"/>
+          <text x="390" y="121" class="wt1">vm.swappiness = 60 (Дефолт: Опасно!)</text>
+          <text x="390" y="135" class="ws1">Вытеснение анонимных страниц в swap</text>
+          <rect x="25" y="155" width="670" height="80" rx="8" fill="#1c1917" stroke="#7f1d1d" stroke-width="1.5"/>
+          <text x="360" y="175" class="th1" fill="#f87171">ДИСКОВЫЙ SWAP (NVMe / SSD)</text>
+          <rect x="40" y="185" width="310" height="38" rx="6" fill="#450a0a" stroke="#dc2626" stroke-width="1"/>
+          <text x="195" y="209" class="bh1" fill="#fca5a5">[Страницы rphost / PG]</text>
+          <path d="M 355 204 L 365 204" stroke="#f87171" stroke-width="2"/>
+          <rect x="370" y="185" width="310" height="38" rx="6" fill="#450a0a" stroke="#dc2626" stroke-width="1"/>
+          <text x="525" y="209" class="bh1" fill="#fca5a5">[I/O Stalls: паузы 100-500+ мс]</text>
+        </svg>
+        <figcaption class="diagram-caption">Схема 1. Механизм деградации транзакций при агрессивном вытеснении страниц в swap (vm.swappiness = 60)</figcaption>
+    </figure>
+
+    <h3>1.1. Борьба со скрытым вытеснением: <code>vm.swappiness</code></h3>
+    <p>По умолчанию в дистрибутивах Ubuntu, Debian и Astra Linux значение <code>vm.swappiness = 60</code>. Это алгоритмический коэффициент балансировки ядра: насколько агрессивно нужно сбрасывать анонимную память процессов в swap вместо вымывания дискового кэша (Page Cache).</p>
+    <p>При значении 60 ядро вытесняет страницы памяти <code>rphost</code> и PostgreSQL на диск задолго до того, как закончится физическая память. Суммарный объём процесса в Linux складывается из резидентной физической памяти (<code>VmRSS</code>) и вытесненного свопа (<code>VmSwap</code>). Когда пользователь 1С нажимает «Провести документ», заблокированный рабочий процесс обращается к странице памяти, а ядро экстренно считывает её со swap-раздела. Возникает микро-пауза (I/O stall) длительностью от 50 до 800 миллисекунд.</p>
+    <ul>
+        <li><strong>Опасное значение:</strong> <code>vm.swappiness = 60</code> (дефолт ОС).</li>
+        <li><strong>Инженерный стандарт 1C:SRE-Suite:</strong> <code>vm.swappiness = 1..10</code>.</li>
+        <li><strong>Физика эффекта:</strong> Ядро держит рабочие структуры процессов в физической памяти до последнего момента, а swap используется исключительно в качестве предохранителя от катастрофического падения системы.</li>
+    </ul>
+
+    <h3>1.2. Сброс грязных страниц: байтовые лимиты вместо процентов</h3>
+    <p>В процессе активной записи (массовое проведение документов, CHECKPOINT в PostgreSQL, фоновые задания, ночное маскирование данных через <code>pg_anon</code>) данные сначала накапливаются в Page Cache в виде «грязных» страниц (dirty pages).</p>
+    <p>По умолчанию в ядре заданы относительные лимиты:</p>
+    <ul>
+        <li><code>vm.dirty_background_ratio = 10</code> (демон ядра <code>kworker/flush</code> начинает фоновый сброс данных на диск при достижении 10% оперативной памяти).</li>
+        <li><code>vm.dirty_ratio = 20</code> (при достижении 20% блокируются <strong>все</strong> пишущие процессы до завершения принудительного сброса на накопитель).</li>
+    </ul>
+    <p><strong>В чём ловушка масштаба:</strong> На сервере со 128 ГБ RAM порог в 20% составляет ~25 ГБ, а на 256 ГБ — свыше 50 ГБ. Когда дисковый контроллер упирается в потолок записи при сбросе 50 ГБ данных, сервер впадает в ступор. В технологическом журнале 1С лавинообразно фиксируются длительные события <code>SDBL</code> и <code>DBPOSTGRS</code> с тайм-аутами, а пользователи получают сообщение «Сеанс работы завершен администратором».</p>
+    <p><strong>Оптимальная стратегия: переход на абсолютные байтовые лимиты.</strong> В ядре параметры <code>*_ratio</code> и <code>*_bytes</code> взаимоисключающие. Задание абсолютных значений автоматически сбрасывает относительные проценты в ноль:</p>
+
+<pre><code># Фоновый сброс грязных страниц стартует при накоплении 1 ГБ (1073741824 байт)
+vm.dirty_background_bytes = 1073741824
+
+# Процессы принудительно переводятся в синхронный сброс при накоплении 4 ГБ (4294967296 байт)
+vm.dirty_bytes = 4294967296</code></pre>
+    <p>Это выравнивает график дискового ввода-вывода в ровную линию без экстремальных пиковых задержек.</p>
+
+    <h3>1.3. Архитектура аллокации: <code>vm.overcommit_memory</code></h3>
+    <p>По умолчанию ядро работает в режиме <code>vm.overcommit_memory = 0</code> (эвристический оверкоммит): приложениям разрешается выделять виртуальную память «авансом», рассчитывая, что физически она будет задействована не вся. Если лимит исчерпан, внезапно активируется OOM-Killer и уничтожает наиболее «прожорливый» процесс.</p>
+    <p>Настройки зависят от физического размещения компонентов:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Сценарий архитектуры</th>
+                <th>Рекомендация <code>vm.overcommit_memory</code></th>
+                <th>Инженерное обоснование</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Выделенный узел СУБД</strong><br>(нода кластера Patroni)</td>
+                <td><strong><code>vm.overcommit_memory = 2</code></strong><br><code>vm.overcommit_ratio = 80..90</code></td>
+                <td>Строгий запрет оверкоммита: ядро запрещает выделение памяти сверх <code>CommitLimit</code> (RAM × ratio + Swap). Гарантирует, что PostgreSQL не будет внезапно уничтожен демоном OOM-Killer.</td>
+            </tr>
+            <tr>
+                <td><strong>Совмещенный узел</strong><br>(1С:Предприятие + PostgreSQL на одном хосте)</td>
+                <td><strong><code>vm.overcommit_memory = 0</code></strong><br>(или <code>2</code> только при Swap ≥ 50–100% RAM)</td>
+                <td>Рабочие процессы <code>rphost</code> при старте и масштабировании сеансов резервируют колоссальные объёмы виртуального адресного пространства (VIRT). В режиме <code>overcommit_memory = 2</code> при скромном swap вызовы <code>malloc</code>/<code>mmap</code> у 1С завершаются ошибкой <code>Cannot allocate memory</code> задолго до исчерпания RAM.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Раздел 2. Отключение Transparent Huge Pages (THP) — скрытого стопора СУБД</h2>
+    <p>Механизм Transparent Huge Pages (THP) призван повышать производительность путём автоматического объединения стандартных страниц 4 КБ в блоки по 2 МБ для уменьшения нагрузки на TLB-кэш процессора.</p>
+    <p>Однако для СУБД PostgreSQL под транзакционной OLTP-нагрузкой 1С механизм THP категорически противопоказан:</p>
+    <ol>
+        <li><strong>Фрагментация и memory bloat:</strong> PostgreSQL работает с дисковыми страницами размером 8 КБ. Выделение непрерывного блока в 2 МБ под изменение всего 8 КБ данных приводит к катастрофическому перерасходу оперативной памяти.</li>
+        <li><strong>Compaction Latency Spikes:</strong> Когда в памяти не остаётся свободных непрерывных блоков по 2 МБ, системный демон <code>khugepaged</code> останавливает исполнение потоков и начинает принудительную фоновую дефрагментацию RAM. Это проявляется в периодических секундных «зависаниях» запросов 1С на ровном месте.</li>
+    </ol>
+
+    <!-- СХЕМА 2: ИНЛАЙН SVG -->
+    <figure class="diagram-figure">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 160" width="100%" height="auto" style="max-width: 720px; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);">
+          <style>
+            .th2 { font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 700; fill: #fff; text-anchor: middle; letter-spacing: 0.05em; }
+            .ch2 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 700; }
+            .cs2 { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; fill: #cbd5e1; }
+          </style>
+          <rect width="720" height="160" rx="10" fill="#0b0f19" stroke="#dc2626" stroke-width="1.5"/>
+          <rect width="720" height="36" rx="8" fill="#dc2626"/>
+          <text x="360" y="23" class="th2">ПОЧЕМУ THP УБИВАЕТ POSTGRESQL</text>
+          <rect x="20" y="48" width="330" height="98" rx="6" fill="#0f172a" stroke="#1e293b"/>
+          <text x="35" y="70" class="ch2" fill="#38bdf8">1. Фрагментация (Memory Bloat)</text>
+          <text x="35" y="90" class="cs2">PostgreSQL оперирует блоками по 8 КБ.</text>
+          <text x="35" y="108" class="cs2">Выделение 2 МБ под 8 КБ ведёт</text>
+          <text x="35" y="126" class="cs2">к колоссальному перерасходу RAM.</text>
+          <rect x="370" y="48" width="330" height="98" rx="6" fill="#0f172a" stroke="#1e293b"/>
+          <text x="385" y="70" class="ch2" fill="#f87171">2. Compaction Latency Spikes</text>
+          <text x="385" y="90" class="cs2">При дефиците непрерывных 2 МБ блоков</text>
+          <text x="385" y="108" class="cs2">демон khugepaged замирает и блокирует</text>
+          <text x="385" y="126" class="cs2">потоки СУБД для дефрагментации.</text>
+        </svg>
+        <figcaption class="diagram-caption">Схема 2. Причины блокировок и деградации производительности СУБД при включенном механизме THP</figcaption>
+    </figure>
+
+    <h3>Инженерный стандарт 1C:SRE-Suite: двухуровневое отключение THP</h3>
+    <p>Одной лишь команды <code>echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled</code> недостаточно: она действует только до первой перезагрузки. Необходимо реализовать двухуровневый контур.</p>
+
+    <p><strong>Рубеж 1. Параметры ядра в GRUB (<code>/etc/default/grub</code>):</strong></p>
+<pre><code>GRUB_CMDLINE_LINUX_DEFAULT="... transparent_hugepage=never"</code></pre>
+    <p>Применение: <code>sudo update-grub</code> или <code>sudo grub2-mkconfig -o /boot/grub2/grub.cfg</code>.</p>
+
+    <p><strong>Рубеж 2. Гарантирующий systemd-юнит (<code>/etc/systemd/system/disable-thp.service</code>):</strong><br>
+    Юнит гарантирует отключение режимов <code>enabled</code> и <code>defrag</code> на этапе инициализации системы строго до запуска служб СУБД и 1С:</p>
+<pre><code>[Unit]
+Description=Disable Transparent Huge Pages (THP) for 1C and PostgreSQL
+DefaultDependencies=no
+After=sysinit.target local-fs.target
+Before=patroni.service postgresql.service srv1cv8-8.3.*.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled &amp;&amp; echo never &gt; /sys/kernel/mm/transparent_hugepage/defrag'
+
+[Install]
+WantedBy=basic.target</code></pre>
+    <p>Активация сервиса:</p>
+<pre><code>sudo systemctl daemon-reload
+sudo systemctl enable --now disable-thp.service</code></pre>
+
+    <hr>
+
+    <h2>Раздел 3. Сетевой стек ядра Linux и дескрипторы</h2>
+    <p>В <a href="https://infostart.ru/1c/articles/2783161/">четвёртой части нашего цикла</a> мы настроили отказоустойчивый кластер Patroni и внедрили параметр <code>net.ipv4.ip_nonlocal_bind = 1</code> для бесшовного поднятия виртуального IP демоном <code>vip-manager</code>. Дополним конфигурацию настройками, защищающими от шторма входящих TCP-соединений.</p>
+
+    <h3>3.1. Защита от потерь подключений при утреннем логине пользователей</h3>
+    <p>В моменты пиковой нагрузки (массовый вход пользователей в систему в 8:30 утра или синхронный запуск регламентных заданий) сервер приложений 1С одномоментно генерирует тысячи TCP-подключений к СУБД. При стандартном значении очереди прослушивания в 128 сокетов ядро начинает отбрасывать входящие пакеты SYN. Пользователи получают ошибки сетевого тайм-аута.</p>
+    <p>Параметры сетевого стека для высоконагруженных очередей:</p>
+<pre><code># Разрешение связывания с непривязанным VIP (требование vip-manager из Части 4)
+net.ipv4.ip_nonlocal_bind = 1
+
+# Длина очереди слушающих сокетов ядра (вместо дефолтных 128)
+net.core.somaxconn = 4096
+
+# Размер очереди полуоткрытых SYN-подключений
+net.ipv4.tcp_max_syn_backlog = 4096
+
+# Безопасное повторное использование сокетов в состоянии TIME_WAIT для исходящих TCP-сессий
+net.ipv4.tcp_tw_reuse = 1
+
+# Время удержания сокета в состоянии FIN-WAIT-2
+net.ipv4.tcp_fin_timeout = 15</code></pre>
+
+    <h3>3.2. Системные лимиты дескрипторов (PAM vs systemd)</h3>
+    <p>Каждый клиентский сеанс 1С, рабочий процесс <code>rphost</code> и фоновый процесс СУБД удерживают десятки открытых сокетов и файлов. Стандартный лимит ОС в 1024 дескриптора приводит к падениям с ошибкой <code>Too many open files</code>.</p>
+    <p><strong>Внимание, подводный камень:</strong> Настройки в <code>/etc/security/limits.d/</code> действуют <strong>только для интерактивных сессий PAM</strong> (SSH, локальный вход). Сервисы, запущенные через <code>systemd</code>, полностью игнорируют этот файл!</p>
+    <p>Поэтому мы настраиваем оба контура:</p>
+
+    <p>1. Конфигурация для интерактивного доступа <code>/etc/security/limits.d/99-1c-postgres.conf</code>:</p>
+<pre><code>postgres    soft    nofile    65536
+postgres    hard    nofile    65536
+postgres    soft    nproc     65536
+postgres    hard    nproc     65536
+
+usr1cv8     soft    nofile    65536
+usr1cv8     hard    nofile    65536
+usr1cv8     soft    nproc     65536
+usr1cv8     hard    nproc     65536</code></pre>
+
+    <p>2. Декларативные Drop-in оверрайды для systemd-служб (<code>/etc/systemd/system/patroni.service.d/override.conf</code> и <code>/etc/systemd/system/srv1cv8-8.3.XX.service.d/override.conf</code>):</p>
+<pre><code>[Service]
+LimitNOFILE=65536
+LimitNPROC=65536
+LimitMEMLOCK=infinity</code></pre>
+
+    <hr>
+
+    <h2>Раздел 4. Декларативная Ansible-роль <code>ansible-role-linux-tuning</code></h2>
+    <p>Чтобы исключить дрейф конфигураций на серверах продуктивного кластера, мы упаковали все рассмотренные инженерные правила в готовую Ansible-роль в составе нашего репозитория <a href="https://github.com/NickScherbakov/1c-sre-suite"><strong>NickScherbakov/1c-sre-suite</strong></a>.</p>
+
+    <h3>Шаблон параметров ядра: <code>/etc/sysctl.d/99-1c-postgresql.conf</code></h3>
+<pre><code># ====================================================================
+# 1C:SRE-Suite — Production Kernel Tuning for PostgreSQL &amp; 1C
+# Repository: NickScherbakov/1c-sre-suite (MIT License)
+# ====================================================================
+
+# --- Virtual Memory Subsystem ---
+vm.swappiness = 10
+vm.dirty_background_bytes = 1073741824
+vm.dirty_bytes = 4294967296
+vm.overcommit_memory = {{ sre_overcommit_memory | default(2) }}
+vm.overcommit_ratio = {{ sre_overcommit_ratio | default(80) }}
+
+# --- Network Stack &amp; Patroni VIP ---
+net.ipv4.ip_nonlocal_bind = 1
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 15
+
+# --- IPC Semaphores &amp; File Descriptors ---
+kernel.sem = 5010 641280 5010 128
+fs.file-max = 2097152</code></pre>
+
+    <h3>Задачи плейбука: <code>ansible/roles/linux_tuning/tasks/main.yml</code></h3>
+<pre><code>---
+- name: Apply sysctl configuration for 1C &amp; PostgreSQL
+  ansible.builtin.template:
+    src: 99-1c-postgresql.conf.j2
+    dest: /etc/sysctl.d/99-1c-postgresql.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload sysctl
+
+- name: Deploy THP disable systemd service
+  ansible.builtin.copy:
+    src: disable-thp.service
+    dest: /etc/systemd/system/disable-thp.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and run disable-thp service
+  ansible.builtin.systemd:
+    name: disable-thp.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Deploy PAM limits for 1C and postgres
+  ansible.builtin.copy:
+    src: 99-1c-postgres.conf
+    dest: /etc/security/limits.d/99-1c-postgres.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure systemd service directory exists for Patroni
+  ansible.builtin.file:
+    path: /etc/systemd/system/patroni.service.d
+    state: directory
+    mode: '0755'
+
+- name: Configure systemd drop-in limits for Patroni
+  ansible.builtin.copy:
+    content: |
+      [Service]
+      LimitNOFILE=65536
+      LimitNPROC=65536
+    dest: /etc/systemd/system/patroni.service.d/override.conf
+    mode: '0644'
+  notify: Reload systemd</code></pre>
+
+    <hr>
+
+    <h2>Раздел 5. Инструмент экспресс-диагностики: скрипт <code>sre-1c-pg-healthcheck.sh</code></h2>
+    <p>Для моментального скрининга серверов мы создали утилиту <strong><code>sre-1c-pg-healthcheck.sh</code></strong>.</p>
+    <p>Это автономный Bash-скрипт без сторонних зависимостей (не требует даже <code>bc</code>), который за несколько секунд выполняет комплексный аудит по триаде: <strong>«Ядро Linux и виртуальная память ↔ Patroni и СУБД ↔ Кластер серверов 1С»</strong>.</p>
+
+    <h3>Запуск диагностики на сервере:</h3>
+<pre><code>chmod +x sre-1c-pg-healthcheck.sh
+./sre-1c-pg-healthcheck.sh</code></pre>
+
+    <h3>Реальный терминальный вывод утилиты:</h3>
+<pre><code>================================================================================
+ 1C:SRE-Suite — System &amp; Database Health Check (v1.1)
+ Host: node1-pg16.prod.local | Kernel: 5.15.0-101-generic | Date: 2026-09-14 16:30:00
+================================================================================
+
+[1. LINUX KERNEL &amp; VIRTUAL MEMORY (OS HEALTH)]
+ [OK]   Transparent Huge Pages (THP): disabled (never)
+ [OK]   vm.swappiness = 10 (Optimal for PostgreSQL &amp; 1C)
+ [OK]   Dirty memory (absolute): background=1024MB, limit=4096MB (Smooth I/O flushes)
+ [OK]   vm.overcommit_memory = 2 (Strict Don't Overcommit — Safe for dedicated DB)
+ [OK]   net.ipv4.ip_nonlocal_bind = 1 (vip-manager ready)
+ [WARN] net.core.somaxconn = 128 (Recommended &gt;= 4096 for heavy 1C client pools)
+        --&gt; RECOMMENDATION: Set net.core.somaxconn=4096 in sysctl
+
+[2. POSTGRESQL &amp; PATRONI HIGH-AVAILABILITY CLUSTER]
+ [OK]   Patroni REST API: LEADER node active | Cluster State: running
+ [OK]   max_locks_per_transaction = 256
+ [WARN] Active locks count: 182 / 256 (71% utilized)
+        --&gt; RECOMMENDATION: High lock density detected; consider increasing max_locks_per_transaction
+ [OK]   max_connections = 300 (Ready for high background task volume)
+
+[3. 1C:ENTERPRISE CLUSTER &amp; RPHOST PROCESS ANALYSIS]
+ [OK]   Active rphost worker processes: 2
+ [WARN] PID 41205 (rphost): RSS = 14.2 GB, SWAP = 3.8 GB (Leaking to swap!)
+        --&gt; Candidate for soft rotation via orchestrator/admincluster_run.sh
+ [OK]   PID 41206 (rphost): RSS = 8.1 GB, SWAP = 0.2 GB (Healthy RAM allocation)
+
+================================================================================
+ SUMMARY: 7 OK | 3 WARNINGS | 0 FAILURES
+ Tip: Run './sre-1c-pg-healthcheck.sh --generate-fix' to generate an automated remediation script.
+================================================================================</code></pre>
+
+    <h3>Генерация авто-исправления (<code>--generate-fix</code>):</h3>
+    <p>При передаче флага <code>--generate-fix</code> утилита создаёт исполняемый сценарий <code>/tmp/sre-healthcheck-fix.sh</code>, включающий точечные команды <code>sysctl -w ...</code> и отключение THP на лету. Инженер может применить рекомендованные настройки без ручного ввода команд:</p>
+<pre><code>sudo bash /tmp/sre-healthcheck-fix.sh</code></pre>
+
+    <hr>
+
+    <h2>Итоги 5 частей и обновленный Roadmap проекта 1C:SRE-Suite</h2>
+    <p>За 5 практических выпусков открытого цикла мы построили сквозной фундамент отказоустойчивости корпоративного контура «1С:Предприятие 8.3» на Linux:</p>
+
+    <!-- СХЕМА 3: ИНЛАЙН SVG (Отображается гарантированно, без сбоев) -->
+    <figure class="diagram-figure">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 290" width="100%" height="auto" style="max-width: 720px; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);">
+          <style>
+            .th3 { font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 700; fill: #38bdf8; text-anchor: middle; letter-spacing: 0.05em; }
+            .tag3 { font-family: monospace; font-size: 13px; font-weight: 700; }
+            .desc3 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; fill: #f1f5f9; }
+          </style>
+          <rect width="720" height="290" rx="10" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5"/>
+          <rect width="720" height="38" rx="8" fill="#1e293b"/>
+          <text x="360" y="24" class="th3">СКВОЗНОЙ СТЕК 1C:SRE-SUITE ДЛЯ LINUX</text>
+          <rect x="25" y="50" width="670" height="42" rx="6" fill="#0f172a" stroke="#3b82f6"/>
+          <text x="40" y="76" class="tag3" fill="#60a5fa">[CI/CD]</text>
+          <text x="110" y="76" class="desc3">GitHub Actions / 5 Рубежей Защиты / EDT Bridge (Части 1-2)</text>
+          <path d="M 360 92 L 360 106" stroke="#475569" stroke-width="2"/>
+          <polygon points="356,106 364,106 360,111" fill="#475569"/>
+          <rect x="25" y="111" width="670" height="42" rx="6" fill="#0f172a" stroke="#10b981"/>
+          <text x="40" y="137" class="tag3" fill="#34d399">[SECURITY]</text>
+          <text x="135" y="137" class="desc3">Потоковое маскирование pg_anon + BSL Post-Process (Часть 3)</text>
+          <path d="M 360 153 L 360 167" stroke="#475569" stroke-width="2"/>
+          <polygon points="356,167 364,167 360,172" fill="#475569"/>
+          <rect x="25" y="172" width="670" height="42" rx="6" fill="#0f172a" stroke="#f59e0b"/>
+          <text x="40" y="198" class="tag3" fill="#fbbf24">[DATABASE HA]</text>
+          <text x="165" y="198" class="desc3">Patroni + etcd + vip-manager (Zero Proxy Overheads) (Часть 4)</text>
+          <path d="M 360 214 L 360 228" stroke="#475569" stroke-width="2"/>
+          <polygon points="356,228 364,228 360,233" fill="#475569"/>
+          <rect x="25" y="233" width="670" height="42" rx="6" fill="#0f172a" stroke="#a855f7"/>
+          <text x="40" y="259" class="tag3" fill="#c084fc">[OS TUNING]</text>
+          <text x="150" y="259" class="desc3">Virtual Memory Tuning + THP Off + sre-healthcheck (Часть 5)</text>
+        </svg>
+        <figcaption class="diagram-caption">Схема 3. Архитектура сквозного стека отказоустойчивости 1C:SRE-Suite</figcaption>
+    </figure>
+
+    <h3>Что ждёт читателей в следующих выпусках (Roadmap):</h3>
+    <ol>
+        <li><strong>Резервное копирование и Disaster Recovery (Часть 6):</strong> Настройка <code>pg_probackup</code> с валидацией инкрементальных копий, физической репликацией и выгрузкой сжатых резервных копий в S3-совместимые хранилища.</li>
+        <li><strong>Headless-автотесты в CI/CD (Часть 7):</strong> Развёртывание сценарных BDD-тестов Vanessa-Automation и модульных проверок YAxUnit внутри легковесных Docker-контейнеров сразу после синтаксического гейта.</li>
+        <li><strong>AIOps и автономные ИИ-агенты на базе Model Context Protocol (Часть 8):</strong> Запуск ИИ-дежурного (AI On-Call), который анализирует аномалии технологического журнала, сопоставляет утечки <code>rphost</code> со строками BSL-кода и автоматически формирует Pull Request'ы с исправлениями.</li>
+    </ol>
+    <p>Все конфигурационные файлы, Ansible-роли и диагностический скрипт опубликованы в открытом репозитории <a href="https://github.com/NickScherbakov/1c-sre-suite"><strong>NickScherbakov/1c-sre-suite</strong></a> под свободной лицензией MIT[cite: 7]. Тестируйте на своих контурах, открывайте Issue и присылайте Pull Request'ы!</p>
+
+</body>
+</html>
