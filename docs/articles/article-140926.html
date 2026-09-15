@@ -3,277 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1C:SRE-Suite (Часть 5): Тюнинг ядра Linux и виртуальной памяти под PostgreSQL и сервер «1С:Предприятие»</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.65;
-            color: #24292e;
-            max-width: 960px;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
-            background-color: #ffffff;
-        }
-        h1, h2, h3, h4 {
-            color: #1a202c;
-            font-weight: 600;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-            line-height: 1.3;
-        }
-        h1 { font-size: 2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
-        h2 { font-size: 1.5rem; border-bottom: 1px solid #edf2f7; padding-bottom: 0.4rem; }
-        h3 { font-size: 1.25rem; }
-        p { margin-bottom: 1.2rem; }
-        a { color: #0969da; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        code {
-            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-            font-size: 0.88em;
-            background-color: #f6f8fa;
-            padding: 0.2em 0.4em;
-            border-radius: 4px;
-            border: 1px solid #eaecef;
-        }
-        pre {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            padding: 1.2rem;
-            border-radius: 8px;
-            overflow-x: auto;
-            font-size: 0.88em;
-            line-height: 1.45;
-            border: 1px solid #30363d;
-            margin: 1.2rem 0;
-        }
-        pre code {
-            background: none;
-            color: inherit;
-            padding: 0;
-            border: none;
-            font-size: 1em;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.5rem 0;
-            font-size: 0.95em;
-        }
-        th, td {
-            border: 1px solid #d0d7de;
-            padding: 0.6rem 0.8rem;
-            text-align: left;
-        }
-        th {
-            background-color: #f6f8fa;
-            font-weight: 600;
-        }
-        tr:nth-child(even) { background-color: #fafbfc; }
-        blockquote {
-            margin: 1.5rem 0;
-            padding: 0.8rem 1.2rem;
-            color: #57606a;
-            background-color: #f6f8fa;
-            border-left: 0.25rem solid #0969da;
-            border-radius: 0 4px 4px 0;
-        }
-        blockquote p:last-child { margin-bottom: 0; }
-        ul, ol { padding-left: 1.8rem; margin-bottom: 1.2rem; }
-        li { margin-bottom: 0.4rem; }
-        hr {
-            height: 1px;
-            background-color: #e1e4e8;
-            border: none;
-            margin: 2.5rem 0;
-        }
-        .meta-box {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 1rem;
-            margin-bottom: 2rem;
-            font-size: 0.95em;
-        }
-        .diagram-figure {
-            margin: 2rem 0;
-            text-align: center;
-        }
-        .diagram-caption {
-            margin-top: 0.75rem;
-            font-size: 0.88em;
-            color: #64748b;
-            font-style: italic;
-        }
-    </style>
+    <title>SRE-Suite-for-1C-platform (Часть 5): Тюнинг ядра Linux и виртуальной памяти под PostgreSQL и сервер «1С:Предприятие»</title>
 </head>
-<body>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.65; color: #24292e; max-width: 960px; margin: 0 auto; padding: 20px 15px; background-color: #ffffff;">
 
-    <h1>1C:SRE-Suite (Часть 5): Тюнинг ядра Linux и виртуальной памяти под PostgreSQL и сервер «1С:Предприятие»</h1>
-    <p><strong>Как предотвратить I/O-ступоры, скрытые утечки rphost в swap и микро-паузы СУБД. Разбор физики sysctl, отключение THP, декларативная Ansible-роль и презентация утилиты экспресс-диагностики sre-1c-pg-healthcheck.sh.</strong></p>
+<!-- 1. ШАПКА СТАТЬИ («ВИЗИТКА») -->
+<div style="background: #f4f8fc; border-left: 5px solid #0066cc; border-radius: 6px; padding: 18px 22px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+    <div style="font-size: 22px; font-weight: bold; color: #0066cc; line-height: 1.35; margin-bottom: 8px;">SRE-Suite-for-1C-platform (Часть 5): Тюнинг ядра Linux и&nbsp;виртуальной памяти под PostgreSQL и&nbsp;сервер «1С:Предприятие»</div>
+    <div style="font-size: 15px; color: #2c3e50; line-height: 1.5; margin-bottom: 12px;">Как предотвратить I/O-ступоры, скрытые утечки rphost в&nbsp;swap и&nbsp;микро-паузы СУБД. Разбор физики sysctl, двухуровневое отключение THP, декларативная Ansible-роль и&nbsp;утилита экспресс-диагностики sre-1c-pg-healthcheck.sh.</div>
+    <div style="font-size: 13.5px; color: #4b5563; line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+        <div><strong>Серия публикаций:</strong> <a href="https://infostart.ru/1c/articles/2779597/" style="color: #0066cc; text-decoration: none;" target="_blank">SRE-Suite-for-1C-platform для высоконагруженных систем на&nbsp;Linux</a></div>
+        <div><strong>Авторы проекта:</strong> Нинель и&nbsp;Николай Щербаковы</div>
+        <div><strong>Репозиторий проекта:</strong> <a href="https://github.com/NickScherbakov/1c-sre-suite" style="color: #0066cc; text-decoration: none; font-weight: bold;" target="_blank">NickScherbakov/1c-sre-suite</a> (Лицензия MIT)</div>
+        <div><strong>Проверено на&nbsp;стендах:</strong> Astra Linux 1.7&nbsp;/ Ubuntu 22.04 LTS&nbsp;/ RedOS 7.3, PostgreSQL 16 (Postgres Pro 1C), Платформа «1С:Предприятие 8.3» (релизы 8.3.24.1667, 8.3.25.1394)</div>
+    </div>
+</div>
 
-    <div class="meta-box">
-        <ul>
-            <li><strong>Серия публикаций:</strong> <a href="https://infostart.ru/1c/articles/2779597/">1C:SRE-Suite для высоконагруженных систем на Linux</a></li>
-            <li><strong>Авторы проекта:</strong> Нинель и Николай Щербаковы</li>
-            <li><strong>Репозиторий проекта:</strong> <a href="https://github.com/NickScherbakov/1c-sre-suite">NickScherbakov/1c-sre-suite</a> (Лицензия MIT)</li>
-            <li><strong>Проверено на стендах:</strong> Astra Linux 1.7 / Ubuntu 22.04 LTS / RedOS 7.3, PostgreSQL 16 (Postgres Pro 1C), Платформа «1С:Предприятие 8.3» (релизы 8.3.24.1667, 8.3.25.1394).</li>
-        </ul>
+<!-- 2. ОГЛАВЛЕНИЕ -->
+<div style="border: 1px solid #dbe2ea; border-radius: 8px; padding: 18px 22px; background-color: #ffffff; margin-bottom: 30px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+    <div style="font-weight: bold; font-size: 16px; margin-bottom: 10px; color: #111827;">Оглавление:</div>
+    <ol style="margin: 0; padding-left: 22px; line-height: 1.85; font-size: 14.5px;">
+        <li><a href="#section-1" style="color: #0066cc; text-decoration: none;">Контекст и&nbsp;ретроспектива: выполняем обещания Roadmap</a></li>
+        <li><a href="#section-2" style="color: #0066cc; text-decoration: none;">Анатомия виртуальной памяти Linux: физика поведения под&nbsp;нагрузкой 1С и&nbsp;PostgreSQL</a></li>
+        <li><a href="#section-3" style="color: #0066cc; text-decoration: none;">Ликвидация скрытого стопора СУБД: двухуровневое отключение Transparent Huge Pages</a></li>
+        <li><a href="#section-4" style="color: #0066cc; text-decoration: none;">Сетевой стек ядра и&nbsp;дескрипторы: защита от&nbsp;шторма подключений и&nbsp;лимиты systemd</a></li>
+        <li><a href="#section-5" style="color: #0066cc; text-decoration: none;">Автоматизация через IaC: декларативная Ansible-роль linux_tuning</a></li>
+        <li><a href="#section-6" style="color: #0066cc; text-decoration: none;">Экспресс-диагностика инфраструктуры: утилита аудита sre-1c-pg-healthcheck.sh</a></li>
+        <li><a href="#section-7" style="color: #0066cc; text-decoration: none;">Итоги первого этапа и&nbsp;Roadmap: что ждёт читателей в&nbsp;следующих выпусках</a></li>
+        <li><a href="#section-8" style="color: #0066cc; text-decoration: none;">Предыдущие материалы цикла</a></li>
+    </ol>
+</div>
+
+<!-- РАЗДЕЛ 1 -->
+<h2 id="section-1" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🏛 Контекст и&nbsp;ретроспектива:</span> <span style="color: #0066cc; font-weight: bold;">выполняем обещания Roadmap</span></h2>
+
+<p style="margin-bottom: 14px; font-size: 15px;">В&nbsp;предыдущих четырёх частях открытого инженерного цикла <strong>SRE-Suite-for-1C-platform</strong> мы последовательно разворачивали контур надёжности корпоративного уровня на&nbsp;базе Linux:</p>
+
+<ol style="padding-left: 24px; margin-bottom: 18px; font-size: 14.5px; line-height: 1.75;">
+    <li><a href="https://infostart.ru/1c/articles/2779597/" style="color: #0066cc; text-decoration: none;"><strong>Часть 1:</strong></a> Заложили принципы Infrastructure as Code (IaC), внедрили 5 рубежей обороны в&nbsp;сборочный скрипт <code>1c-ci-linux-build-v4.sh</code> для&nbsp;защиты от&nbsp;«ложного успеха» (False Success) и&nbsp;реализовали внешнюю ротацию рабочих процессов <code>rphost</code> через RAS API.</li>
+    <li><a href="https://infostart.ru/1c/articles/2780378/" style="color: #0066cc; text-decoration: none;"><strong>Часть 2:</strong></a> Построили детерминированный CI/CD-пайплайн в&nbsp;GitHub Actions, решили проблему потери широковещательных UDP-пакетов сетевых HASP-ключей через <code>--net=host</code> и&nbsp;устранили коллизии параллельных сборок через динамический <code>RUN_ID</code>.</li>
+    <li><a href="https://infostart.ru/1c/articles/2781587/" style="color: #0066cc; text-decoration: none;"><strong>Часть 3:</strong></a> Исключили хранение незащищённых боевых дампов при подготовке dev-стендов: реализовали потоковое маскирование <code>pg_anon</code> в&nbsp;Unix-пайпах с&nbsp;платформенной пост-обработкой <code>post-anonymize-1c.bsl</code> без единого прямого SQL-обращения к&nbsp;таблицам базы.</li>
+    <li><a href="https://infostart.ru/1c/articles/2783161/" style="color: #0066cc; text-decoration: none;"><strong>Часть 4:</strong></a> Развернули 3-нодовый отказоустойчивый кластер PostgreSQL под&nbsp;управлением Patroni и&nbsp;etcd, полностью устранили прокси-задержки HAProxy с&nbsp;помощью связки <code>vip-manager</code> и&nbsp;параметра <code>net.ipv4.ip_nonlocal_bind = 1</code>.</li>
+</ol>
+
+<p style="margin-bottom: 16px; font-size: 15px;">В&nbsp;финале четвёртой статьи мы зафиксировали обязательство: <strong>спуститься на&nbsp;уровень операционной системы и&nbsp;представить инженерные сценарии глубокой оптимизации ядра Linux под&nbsp;совместную работу PostgreSQL и&nbsp;платформы 1С</strong>.</p>
+
+<!-- ВРЕЗКА ВАЖНО (COMPLIANCE) -->
+<p style="background: #f7faf7; border-left: 4px solid #2e7d32; border-radius: 4px; padding: 12px 16px; font-size: 14px; color: #1b3a1e; margin: 20px 0; line-height: 1.6;"><strong>Важно (соблюдение регламентов модерации Infostart):</strong> Все рассматриваемые механизмы действуют исключительно на&nbsp;уровне инфраструктуры ОС&nbsp;Linux и&nbsp;документированных настроек СУБД PostgreSQL. Они не&nbsp;затрагивают структуру метаданных конфигураций 1С, не&nbsp;подменяют регламентные процедуры платформы прямыми SQL-командами и&nbsp;полностью соответствуют официальным требованиям фирмы «1С» к&nbsp;эксплуатации высоконагруженных систем.</p>
+
+<!-- РАЗДЕЛ 2 -->
+<h2 id="section-2" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">📂 Анатомия виртуальной памяти Linux:</span> <span style="color: #0066cc; font-weight: bold;">физика поведения под&nbsp;нагрузкой 1С и&nbsp;PostgreSQL</span></h2>
+
+<p style="margin-bottom: 14px; font-size: 15px;">Главный вызов при эксплуатации СУБД PostgreSQL и&nbsp;сервера приложений «1С:Предприятие» в&nbsp;среде Linux&nbsp;— это <strong>жёсткая конкуренция за&nbsp;физическую оперативную память (RAM) и&nbsp;дисковый ввод-вывод (I/O)</strong>.</p>
+<p style="margin-bottom: 14px; font-size: 15px;">Рабочие процессы <code>rphost</code> и&nbsp;бэкенды <code>postgres</code> непрерывно выделяют и&nbsp;освобождают анонимную память под&nbsp;выборки, кэши и&nbsp;агрегаты. Если подсистема виртуальной памяти Linux настроена по&nbsp;умолчанию, поведение стандартного менеджера страниц ядра становится деструктивным для&nbsp;транзакционной OLTP-нагрузки.</p>
+
+<!-- СХЕМА 1 -->
+<div style="border: 1px solid #dbe2ea; border-radius: 10px; background-color: #f8fafc; padding: 22px 20px; margin: 25px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+    <div style="text-align: center; margin-bottom: 18px;">
+        <div style="font-size: 18px; font-weight: bold; color: #0f2d59;">Физическая оперативная память и вытеснение в Swap</div>
+        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Механизм деградации транзакций при дефолтном значении vm.swappiness = 60</div>
     </div>
 
-    <hr>
+    <!-- Блок 1: RAM -->
+    <div style="border: 1px solid #93c5fd; border-radius: 8px; overflow: hidden; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="background-color: #1e56a0; color: #ffffff; font-weight: bold; font-size: 13.5px; padding: 9px 16px; letter-spacing: 0.03em;">
+            ФИЗИЧЕСКАЯ ОПЕРАТИВНАЯ ПАМЯТЬ (RAM)
+        </div>
+        <div style="padding: 12px;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width: 50%; padding: 6px; border: none; background: transparent; vertical-align: top;">
+                            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px 14px;">
+                                <div style="font-weight: bold; color: #1e40af; font-size: 13.5px;">PostgreSQL Buffers</div>
+                                <div style="font-size: 12px; color: #475569; margin-top: 3px;">Кэш страниц <code>shared_buffers</code>, блоки по 8&nbsp;КБ</div>
+                            </div>
+                        </td>
+                        <td style="width: 50%; padding: 6px; border: none; background: transparent; vertical-align: top;">
+                            <div style="background-color: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 10px 14px;">
+                                <div style="font-weight: bold; color: #3730a3; font-size: 13.5px;">1C:Enterprise Memory</div>
+                                <div style="font-size: 12px; color: #475569; margin-top: 3px;">Рабочие процессы <code>rphost</code>, сеансовые структуры <code>VmRSS</code></div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    <h2>Введение и ретроспектива: выполняем обещания Roadmap</h2>
-    <p>В предыдущих четырёх частях открытого инженерного цикла <strong>1C:SRE-Suite</strong> мы последовательно разворачивали контур надёжности корпоративного уровня:</p>
-    <ol>
-        <li><a href="https://infostart.ru/1c/articles/2779597/"><strong>Часть 1:</strong></a> Заложили принципы Infrastructure as Code (IaC), внедрили 5 рубежей обороны в сборочный скрипт <code>1c-ci-linux-build-v4.sh</code> для защиты от «ложного успеха» (False Success) и реализовали внешнюю ротацию рабочих процессов <code>rphost</code> через RAS API.</li>
-        <li><a href="https://infostart.ru/1c/articles/2780378/"><strong>Часть 2:</strong></a> Построили детерминированный CI/CD-пайплайн в GitHub Actions, решили проблему потери широковещательных UDP-пакетов сетевых HASP-ключей через <code>--net=host</code> и устранили коллизии параллельных сборок через динамический <code>RUN_ID</code>.</li>
-        <li><a href="https://infostart.ru/1c/articles/2781587/"><strong>Часть 3:</strong></a> Исключили хранение незащищённых боевых дампов при подготовке dev-стендов: реализовали потоковое маскирование <code>pg_anon</code> в Unix-пайпах с платформенной пост-обработкой <code>post-anonymize-1c.bsl</code> без единого прямого SQL-обращения к таблицам базы.</li>
-        <li><a href="https://infostart.ru/1c/articles/2783161/"><strong>Часть 4:</strong></a> Развернули 3-нодовый отказоустойчивый кластер PostgreSQL под управлением Patroni и etcd, полностью устранили прокси-задержки HAProxy с помощью связки <code>vip-manager</code> и параметра <code>net.ipv4.ip_nonlocal_bind = 1</code>.</li>
-    </ol>
-    <p>В финале четвёртой статьи мы зафиксировали обязательство: <strong>спуститься на уровень операционной системы и представить инженерные сценарии глубокой оптимизации ядра Linux под совместную работу PostgreSQL и платформы 1С</strong>.</p>
+    <!-- Стрелка перехода вниз -->
+    <div style="text-align: center; margin: 10px 0;">
+        <div style="width: 4px; height: 16px; background-color: #ef4444; margin: 0 auto;"></div>
+        <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid #ef4444; margin: 0 auto;"></div>
+    </div>
 
-    <blockquote>
-        <p><strong>Важно (соблюдение регламентов модерации Infostart):</strong> Все рассматриваемые механизмы действуют исключительно на уровне инфраструктуры ОС Linux и документированных настроек СУБД PostgreSQL. Они не затрагивают структуру метаданных конфигураций 1С, не подменяют регламентные процедуры платформы прямыми SQL-командами и полностью соответствуют официальным требованиям фирмы «1С» к эксплуатации высоконагруженных систем.</p>
-    </blockquote>
+    <!-- Предупреждающая плашка -->
+    <div style="background-color: #fef2f2; border: 1px solid #f87171; border-radius: 6px; padding: 10px 16px; text-align: center; max-width: 520px; margin: 0 auto; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+        <div style="font-weight: bold; color: #991b1b; font-size: 13.5px;">vm.swappiness = 60 (Дефолт ОС: Опасно!)</div>
+        <div style="font-size: 12px; color: #b91c1c; margin-top: 2px;">Вытеснение анонимных страниц 1С и PostgreSQL в swap задолго до исчерпания RAM</div>
+    </div>
 
-    <hr>
+    <!-- Стрелка перехода вниз -->
+    <div style="text-align: center; margin: 10px 0;">
+        <div style="width: 4px; height: 16px; background-color: #dc2626; margin: 0 auto;"></div>
+        <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid #dc2626; margin: 0 auto;"></div>
+    </div>
 
-    <h2>Раздел 1. Анатомия и физика виртуальной памяти Linux под нагрузкой 1С</h2>
-    <p>Главный вызов при эксплуатации СУБД PostgreSQL и сервера приложений «1С:Предприятие» в среде Linux — это <strong>жесткая конкуренция за физическую оперативную память (RAM) и дисковый ввод-вывод (I/O)</strong>.</p>
-    <p>Рабочие процессы <code>rphost</code> и бэкенды <code>postgres</code> непрерывно выделяют и освобождают анонимную память под выборки, кэши и агрегаты. Если подсистема виртуальной памяти Linux настроена по умолчанию, поведение стандартного менеджера страниц ядра становится разрушительным для транзакционной OLTP-нагрузки.</p>
+    <!-- Блок 2: Swap -->
+    <div style="border: 1px solid #fca5a5; border-radius: 8px; overflow: hidden; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="background-color: #991b1b; color: #ffffff; font-weight: bold; font-size: 13.5px; padding: 9px 16px; letter-spacing: 0.03em;">
+            ДИСКОВЫЙ SWAP (NVMe / SSD): ЗОНА I/O-КОЛЛИЗИЙ
+        </div>
+        <div style="padding: 12px;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width: 50%; padding: 6px; border: none; background: transparent; vertical-align: top;">
+                            <div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 10px 14px;">
+                                <div style="font-weight: bold; color: #9f1239; font-size: 13.5px;">Вытесненные страницы rphost / PG</div>
+                                <div style="font-size: 12px; color: #475569; margin-top: 3px;">Чтение структур из swap при транзакционных вызовах</div>
+                            </div>
+                        </td>
+                        <td style="width: 50%; padding: 6px; border: none; background: transparent; vertical-align: top;">
+                            <div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 10px 14px;">
+                                <div style="font-weight: bold; color: #9f1239; font-size: 13.5px;">I/O Stalls (Ступоры ввода-вывода)</div>
+                                <div style="font-size: 12px; color: #475569; margin-top: 3px;">Микро-паузы 100&ndash;800+ мс, длительные вызовы SDBL и тайм-ауты</div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    <!-- СХЕМА 1: ИНЛАЙН SVG -->
-    <figure class="diagram-figure">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 250" width="100%" height="auto" style="max-width: 720px; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);">
-          <style>
-            .th1 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 700; fill: #94a3b8; text-anchor: middle; letter-spacing: 0.05em; }
-            .bh1 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 600; fill: #f8fafc; text-anchor: middle; }
-            .bs1 { font-family: system-ui, -apple-system, sans-serif; font-size: 11px; fill: #cbd5e1; text-anchor: middle; }
-            .wt1 { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; font-weight: 700; fill: #ef4444; }
-            .ws1 { font-family: system-ui, -apple-system, sans-serif; font-size: 11px; fill: #fca5a5; }
-          </style>
-          <rect width="720" height="250" rx="10" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5"/>
-          <rect x="25" y="15" width="670" height="85" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
-          <text x="360" y="35" class="th1">ФИЗИЧЕСКАЯ ОПЕРАТИВНАЯ ПАМЯТЬ (RAM)</text>
-          <rect x="40" y="45" width="310" height="42" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1"/>
-          <text x="195" y="65" class="bh1">PostgreSQL Buffers</text>
-          <text x="195" y="79" class="bs1">shared_buffers / кэш страниц</text>
-          <rect x="370" y="45" width="310" height="42" rx="6" fill="#312e81" stroke="#6366f1" stroke-width="1"/>
-          <text x="525" y="65" class="bh1">1C:Enterprise Memory</text>
-          <text x="525" y="79" class="bs1">процессы rphost / VmRSS</text>
-          <path d="M 360 100 L 360 145" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 3"/>
-          <polygon points="355,145 365,145 360,153" fill="#ef4444"/>
-          <rect x="380" y="105" width="300" height="38" rx="4" fill="#450a0a" stroke="#991b1b" stroke-width="1"/>
-          <text x="390" y="121" class="wt1">vm.swappiness = 60 (Дефолт: Опасно!)</text>
-          <text x="390" y="135" class="ws1">Вытеснение анонимных страниц в swap</text>
-          <rect x="25" y="155" width="670" height="80" rx="8" fill="#1c1917" stroke="#7f1d1d" stroke-width="1.5"/>
-          <text x="360" y="175" class="th1" fill="#f87171">ДИСКОВЫЙ SWAP (NVMe / SSD)</text>
-          <rect x="40" y="185" width="310" height="38" rx="6" fill="#450a0a" stroke="#dc2626" stroke-width="1"/>
-          <text x="195" y="209" class="bh1" fill="#fca5a5">[Страницы rphost / PG]</text>
-          <path d="M 355 204 L 365 204" stroke="#f87171" stroke-width="2"/>
-          <rect x="370" y="185" width="310" height="38" rx="6" fill="#450a0a" stroke="#dc2626" stroke-width="1"/>
-          <text x="525" y="209" class="bh1" fill="#fca5a5">[I/O Stalls: паузы 100-500+ мс]</text>
-        </svg>
-        <figcaption class="diagram-caption">Схема 1. Механизм деградации транзакций при агрессивном вытеснении страниц в swap (vm.swappiness = 60)</figcaption>
-    </figure>
+    <div style="font-size: 13px; color: #64748b; font-style: italic; margin-top: 14px; text-align: center;">Схема 1. Механизм деградации транзакций при агрессивном вытеснении страниц в swap (vm.swappiness = 60)</div>
+</div>
 
-    <h3>1.1. Борьба со скрытым вытеснением: <code>vm.swappiness</code></h3>
-    <p>По умолчанию в дистрибутивах Ubuntu, Debian и Astra Linux значение <code>vm.swappiness = 60</code>. Это алгоритмический коэффициент балансировки ядра: насколько агрессивно нужно сбрасывать анонимную память процессов в swap вместо вымывания дискового кэша (Page Cache).</p>
-    <p>При значении 60 ядро вытесняет страницы памяти <code>rphost</code> и PostgreSQL на диск задолго до того, как закончится физическая память. Суммарный объём процесса в Linux складывается из резидентной физической памяти (<code>VmRSS</code>) и вытесненного свопа (<code>VmSwap</code>). Когда пользователь 1С нажимает «Провести документ», заблокированный рабочий процесс обращается к странице памяти, а ядро экстренно считывает её со swap-раздела. Возникает микро-пауза (I/O stall) длительностью от 50 до 800 миллисекунд.</p>
-    <ul>
-        <li><strong>Опасное значение:</strong> <code>vm.swappiness = 60</code> (дефолт ОС).</li>
-        <li><strong>Инженерный стандарт 1C:SRE-Suite:</strong> <code>vm.swappiness = 1..10</code>.</li>
-        <li><strong>Физика эффекта:</strong> Ядро держит рабочие структуры процессов в физической памяти до последнего момента, а swap используется исключительно в качестве предохранителя от катастрофического падения системы.</li>
-    </ul>
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">1.1. Борьба со&nbsp;скрытым вытеснением: <code>vm.swappiness</code></h3>
+<p style="margin-bottom: 14px; font-size: 15px;">По&nbsp;умолчанию в&nbsp;дистрибутивах Ubuntu, Debian и&nbsp;Astra Linux значение <code>vm.swappiness = 60</code>. Это алгоритмический коэффициент балансировки ядра: насколько агрессивно нужно сбрасывать анонимную память процессов в&nbsp;swap вместо вымывания дискового кэша (Page Cache).</p>
+<p style="margin-bottom: 14px; font-size: 15px;">При значении 60 ядро вытесняет страницы памяти <code>rphost</code> и&nbsp;PostgreSQL на&nbsp;диск задолго до&nbsp;того, как закончится физическая память. Суммарный объём процесса в&nbsp;Linux складывается из&nbsp;резидентной физической памяти (<code>VmRSS</code>) и&nbsp;вытесненного свопа (<code>VmSwap</code>). Когда пользователь 1С нажимает «Провести документ», заблокированный рабочий процесс обращается к&nbsp;странице памяти, а&nbsp;ядро экстренно считывает её со&nbsp;swap-раздела. Возникает микро-пауза (I/O stall) длительностью от&nbsp;50 до&nbsp;800 миллисекунд.</p>
+<ul style="padding-left: 22px; margin-bottom: 18px; font-size: 14.5px; line-height: 1.7;">
+    <li><strong>Опасное значение:</strong> <code>vm.swappiness = 60</code> (дефолт ОС).</li>
+    <li><strong>Инженерный стандарт SRE-Suite-for-1C-platform:</strong> <code>vm.swappiness = 1..10</code>.</li>
+    <li><strong>Физика эффекта:</strong> Ядро держит рабочие структуры процессов в&nbsp;физической памяти до&nbsp;последнего момента, а&nbsp;swap используется исключительно в&nbsp;качестве предохранителя от&nbsp;катастрофического падения системы.</li>
+</ul>
 
-    <h3>1.2. Сброс грязных страниц: байтовые лимиты вместо процентов</h3>
-    <p>В процессе активной записи (массовое проведение документов, CHECKPOINT в PostgreSQL, фоновые задания, ночное маскирование данных через <code>pg_anon</code>) данные сначала накапливаются в Page Cache в виде «грязных» страниц (dirty pages).</p>
-    <p>По умолчанию в ядре заданы относительные лимиты:</p>
-    <ul>
-        <li><code>vm.dirty_background_ratio = 10</code> (демон ядра <code>kworker/flush</code> начинает фоновый сброс данных на диск при достижении 10% оперативной памяти).</li>
-        <li><code>vm.dirty_ratio = 20</code> (при достижении 20% блокируются <strong>все</strong> пишущие процессы до завершения принудительного сброса на накопитель).</li>
-    </ul>
-    <p><strong>В чём ловушка масштаба:</strong> На сервере со 128 ГБ RAM порог в 20% составляет ~25 ГБ, а на 256 ГБ — свыше 50 ГБ. Когда дисковый контроллер упирается в потолок записи при сбросе 50 ГБ данных, сервер впадает в ступор. В технологическом журнале 1С лавинообразно фиксируются длительные события <code>SDBL</code> и <code>DBPOSTGRS</code> с тайм-аутами, а пользователи получают сообщение «Сеанс работы завершен администратором».</p>
-    <p><strong>Оптимальная стратегия: переход на абсолютные байтовые лимиты.</strong> В ядре параметры <code>*_ratio</code> и <code>*_bytes</code> взаимоисключающие. Задание абсолютных значений автоматически сбрасывает относительные проценты в ноль:</p>
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">1.2. Сброс грязных страниц: байтовые лимиты вместо процентов</h3>
+<p style="margin-bottom: 14px; font-size: 15px;">В&nbsp;процессе активной записи (массовое проведение документов, CHECKPOINT в&nbsp;PostgreSQL, фоновые задания, ночное маскирование данных через <code>pg_anon</code>) данные сначала накапливаются в&nbsp;Page Cache в&nbsp;виде «грязных» страниц (dirty pages).</p>
+<p style="margin-bottom: 14px; font-size: 15px;">По&nbsp;умолчанию в&nbsp;ядре заданы относительные лимиты:</p>
+<ul style="padding-left: 22px; margin-bottom: 14px; font-size: 14.5px; line-height: 1.7;">
+    <li><code>vm.dirty_background_ratio = 10</code> (демон ядра <code>kworker/flush</code> начинает фоновый сброс данных на&nbsp;диск при достижении 10% оперативной памяти).</li>
+    <li><code>vm.dirty_ratio = 20</code> (при достижении 20% блокируются <strong>все</strong> пишущие процессы до&nbsp;завершения принудительного сброса на&nbsp;накопитель).</li>
+</ul>
 
-<pre><code># Фоновый сброс грязных страниц стартует при накоплении 1 ГБ (1073741824 байт)
+<p style="margin-bottom: 12px; font-size: 15px;"><strong>В&nbsp;чём ловушка масштаба:</strong> На&nbsp;сервере со&nbsp;128&nbsp;ГБ RAM порог в&nbsp;20% составляет ~25&nbsp;ГБ, а&nbsp;на&nbsp;256&nbsp;ГБ&nbsp;— свыше 50&nbsp;ГБ. Когда дисковый контроллер упирается в&nbsp;потолок записи при сбросе 50&nbsp;ГБ данных, сервер впадает в&nbsp;ступор. В&nbsp;технологическом журнале 1С лавинообразно фиксируются длительные события <code>SDBL</code> и&nbsp;<code>DBPOSTGRS</code> с&nbsp;тайм-аутами, а&nbsp;пользователи получают сообщение «Сеанс работы завершен администратором».</p>
+
+<p style="font-size: 13.5px; color: #64748b; font-style: italic; margin-bottom: 16px;">(Примечание в&nbsp;соответствии с&nbsp;п.&nbsp;2.2.30 правил Infostart: рассматриваемые объёмы 128&ndash;256&nbsp;ГБ представляют собой обобщённый профиль оборудования, сформированный на&nbsp;основе опыта сопровождения высоконагруженных контуров; конкретные цифры приведены как усреднённый инженерный ориентир масштабирования).</p>
+
+<p style="margin-bottom: 14px; font-size: 15px;"><strong>Оптимальная стратегия: переход на&nbsp;абсолютные байтовые лимиты.</strong> В&nbsp;ядре параметры <code>*_ratio</code> и&nbsp;<code>*_bytes</code> взаимно исключают друг друга. Назначение абсолютных значений автоматически сбрасывает проценты в&nbsp;ноль:</p>
+
+<!-- БЛОК КОДА 1: DIRTY BYTES -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Sysctl &mdash; /etc/sysctl.d/99-1c-dirty-bytes.conf</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Page Cache Лимиты</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;"># Фоновый сброс грязных страниц стартует при накоплении 1 ГБ (1073741824 байт)
 vm.dirty_background_bytes = 1073741824
 
 # Процессы принудительно переводятся в синхронный сброс при накоплении 4 ГБ (4294967296 байт)
-vm.dirty_bytes = 4294967296</code></pre>
-    <p>Это выравнивает график дискового ввода-вывода в ровную линию без экстремальных пиковых задержек.</p>
+vm.dirty_bytes = 4294967296</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <h3>1.3. Архитектура аллокации: <code>vm.overcommit_memory</code></h3>
-    <p>По умолчанию ядро работает в режиме <code>vm.overcommit_memory = 0</code> (эвристический оверкоммит): приложениям разрешается выделять виртуальную память «авансом», рассчитывая, что физически она будет задействована не вся. Если лимит исчерпан, внезапно активируется OOM-Killer и уничтожает наиболее «прожорливый» процесс.</p>
-    <p>Настройки зависят от физического размещения компонентов:</p>
+<p style="margin-bottom: 14px; font-size: 15px;">Это стабилизирует график дискового ввода-вывода в&nbsp;ровную предсказуемую линию без экстремальных пиковых задержек.</p>
 
-    <table>
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">1.3. Архитектура аллокации: <code>vm.overcommit_memory</code></h3>
+<p style="margin-bottom: 14px; font-size: 15px;">По&nbsp;умолчанию ядро функционирует в&nbsp;режиме <code>vm.overcommit_memory = 0</code> (эвристический оверкоммит): процессам разрешается запрашивать память авансом. Если лимит исчерпан, активируется OOM-Killer и&nbsp;уничтожает наиболее «прожорливый» процесс.</p>
+
+<p style="margin-bottom: 14px; font-size: 15px;">Инженерные настройки зависят от&nbsp;физического разделения ролей серверов:</p>
+
+<!-- ТАБЛИЦА OVERCOMMIT -->
+<div style="overflow-x: auto; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.55;">
         <thead>
-            <tr>
-                <th>Сценарий архитектуры</th>
-                <th>Рекомендация <code>vm.overcommit_memory</code></th>
-                <th>Инженерное обоснование</th>
+            <tr style="background-color: #f1f5f9; text-align: left;">
+                <th style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; color: #0f172a; width: 28%;">Сценарий архитектуры</th>
+                <th style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; color: #0f172a; width: 32%;">Рекомендация vm.overcommit_memory</th>
+                <th style="border: 1px solid #cbd5e1; padding: 10px 14px; font-weight: 600; color: #0f172a;">Инженерное обоснование</th>
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td><strong>Выделенный узел СУБД</strong><br>(нода кластера Patroni)</td>
-                <td><strong><code>vm.overcommit_memory = 2</code></strong><br><code>vm.overcommit_ratio = 80..90</code></td>
-                <td>Строгий запрет оверкоммита: ядро запрещает выделение памяти сверх <code>CommitLimit</code> (RAM × ratio + Swap). Гарантирует, что PostgreSQL не будет внезапно уничтожен демоном OOM-Killer.</td>
+            <tr style="background-color: #ffffff;">
+                <td style="border: 1px solid #cbd5e1; padding: 10px 14px; vertical-align: top;"><strong>Выделенный узел СУБД</strong><br><span style="color: #64748b; font-size: 13px;">(нода кластера Patroni)</span></td>
+                <td style="border: 1px solid #cbd5e1; padding: 10px 14px; vertical-align: top;"><code style="font-family: Consolas, monospace; background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-weight: bold;">vm.overcommit_memory = 2</code><br><code style="font-family: Consolas, monospace; background: #f1f5f9; padding: 2px 5px; border-radius: 4px;">vm.overcommit_ratio = 80..90</code></td>
+                <td style="border: 1px solid #cbd5e1; padding: 10px 14px; vertical-align: top;">Строгий запрет оверкоммита: ядро отклоняет запросы памяти сверх <code>CommitLimit</code> (RAM &times; ratio + Swap). Исключает внезапное завершение процессов PostgreSQL демоном OOM-Killer.</td>
             </tr>
-            <tr>
-                <td><strong>Совмещенный узел</strong><br>(1С:Предприятие + PostgreSQL на одном хосте)</td>
-                <td><strong><code>vm.overcommit_memory = 0</code></strong><br>(или <code>2</code> только при Swap ≥ 50–100% RAM)</td>
-                <td>Рабочие процессы <code>rphost</code> при старте и масштабировании сеансов резервируют колоссальные объёмы виртуального адресного пространства (VIRT). В режиме <code>overcommit_memory = 2</code> при скромном swap вызовы <code>malloc</code>/<code>mmap</code> у 1С завершаются ошибкой <code>Cannot allocate memory</code> задолго до исчерпания RAM.</td>
+            <tr style="background-color: #f8fafc;">
+                <td style="border: 1px solid #cbd5e1; padding: 10px 14px; vertical-align: top;"><strong>Совмещённый узел</strong><br><span style="color: #64748b; font-size: 13px;">(1С:Предприятие + PostgreSQL на&nbsp;одном хосте)</span></td>
+                <td style="border: 1px solid #cbd5e1; padding: 10px 14px; vertical-align: top;"><code style="font-family: Consolas, monospace; background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-weight: bold;">vm.overcommit_memory = 0</code><br><span style="color: #64748b; font-size: 12.5px;">(или <code>2</code> только при Swap &ge; 50&ndash;100% RAM)</span></td>
+                <td style="border: 1px solid #cbd5e1; padding: 10px 14px; vertical-align: top;">Рабочие процессы <code>rphost</code> резервируют колоссальные объёмы виртуального адресного пространства (VIRT). В&nbsp;режиме <code>overcommit_memory = 2</code> при скромном swap вызовы <code>malloc</code>/<code>mmap</code> завершаются фатальной ошибкой <em>Cannot allocate memory</em> задолго до&nbsp;исчерпания физической RAM.</td>
             </tr>
         </tbody>
     </table>
+</div>
 
-    <hr>
+<!-- РАЗДЕЛ 3 -->
+<h2 id="section-3" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🛡 Ликвидация скрытого стопора СУБД:</span> <span style="color: #0066cc; font-weight: bold;">двухуровневое отключение Transparent Huge Pages</span></h2>
 
-    <h2>Раздел 2. Отключение Transparent Huge Pages (THP) — скрытого стопора СУБД</h2>
-    <p>Механизм Transparent Huge Pages (THP) призван повышать производительность путём автоматического объединения стандартных страниц 4 КБ в блоки по 2 МБ для уменьшения нагрузки на TLB-кэш процессора.</p>
-    <p>Однако для СУБД PostgreSQL под транзакционной OLTP-нагрузкой 1С механизм THP категорически противопоказан:</p>
-    <ol>
-        <li><strong>Фрагментация и memory bloat:</strong> PostgreSQL работает с дисковыми страницами размером 8 КБ. Выделение непрерывного блока в 2 МБ под изменение всего 8 КБ данных приводит к катастрофическому перерасходу оперативной памяти.</li>
-        <li><strong>Compaction Latency Spikes:</strong> Когда в памяти не остаётся свободных непрерывных блоков по 2 МБ, системный демон <code>khugepaged</code> останавливает исполнение потоков и начинает принудительную фоновую дефрагментацию RAM. Это проявляется в периодических секундных «зависаниях» запросов 1С на ровном месте.</li>
-    </ol>
+<p style="margin-bottom: 14px; font-size: 15px;">Механизм Transparent Huge Pages (THP) проектировался для&nbsp;повышения быстродействия путём автоматического объединения базовых страниц 4&nbsp;КБ в&nbsp;блоки по&nbsp;2&nbsp;МБ с&nbsp;целью разгрузки TLB-кэша процессора.</p>
+<p style="margin-bottom: 14px; font-size: 15px;">Для&nbsp;СУБД PostgreSQL под&nbsp;высоконагруженной транзакционной нагрузкой 1С механизм THP гарантированно провоцирует деградацию:</p>
 
-    <!-- СХЕМА 2: ИНЛАЙН SVG -->
-    <figure class="diagram-figure">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 160" width="100%" height="auto" style="max-width: 720px; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);">
-          <style>
-            .th2 { font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 700; fill: #fff; text-anchor: middle; letter-spacing: 0.05em; }
-            .ch2 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; font-weight: 700; }
-            .cs2 { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; fill: #cbd5e1; }
-          </style>
-          <rect width="720" height="160" rx="10" fill="#0b0f19" stroke="#dc2626" stroke-width="1.5"/>
-          <rect width="720" height="36" rx="8" fill="#dc2626"/>
-          <text x="360" y="23" class="th2">ПОЧЕМУ THP УБИВАЕТ POSTGRESQL</text>
-          <rect x="20" y="48" width="330" height="98" rx="6" fill="#0f172a" stroke="#1e293b"/>
-          <text x="35" y="70" class="ch2" fill="#38bdf8">1. Фрагментация (Memory Bloat)</text>
-          <text x="35" y="90" class="cs2">PostgreSQL оперирует блоками по 8 КБ.</text>
-          <text x="35" y="108" class="cs2">Выделение 2 МБ под 8 КБ ведёт</text>
-          <text x="35" y="126" class="cs2">к колоссальному перерасходу RAM.</text>
-          <rect x="370" y="48" width="330" height="98" rx="6" fill="#0f172a" stroke="#1e293b"/>
-          <text x="385" y="70" class="ch2" fill="#f87171">2. Compaction Latency Spikes</text>
-          <text x="385" y="90" class="cs2">При дефиците непрерывных 2 МБ блоков</text>
-          <text x="385" y="108" class="cs2">демон khugepaged замирает и блокирует</text>
-          <text x="385" y="126" class="cs2">потоки СУБД для дефрагментации.</text>
-        </svg>
-        <figcaption class="diagram-caption">Схема 2. Причины блокировок и деградации производительности СУБД при включенном механизме THP</figcaption>
-    </figure>
+<ol style="padding-left: 22px; margin-bottom: 18px; font-size: 14.5px; line-height: 1.75;">
+    <li><strong>Фрагментация и&nbsp;Memory Bloat:</strong> PostgreSQL оперирует дисковыми страницами фиксированного размера 8&nbsp;КБ. Выделение огромного непрерывного блока в&nbsp;2&nbsp;МБ под&nbsp;модификацию всего 8&nbsp;КБ данных вызывает лавинообразный перерасход оперативной памяти.</li>
+    <li><strong>Compaction Latency Spikes:</strong> При нехватке свободных непрерывных блоков 2&nbsp;МБ системный демон ядра <code>khugepaged</code> приостанавливает выполнение рабочих потоков и&nbsp;запускает принудительную синхронную дефрагментацию RAM. Пользователи 1С ощущают это как необъяснимые секундные зависания интерфейса.</li>
+</ol>
 
-    <h3>Инженерный стандарт 1C:SRE-Suite: двухуровневое отключение THP</h3>
-    <p>Одной лишь команды <code>echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled</code> недостаточно: она действует только до первой перезагрузки. Необходимо реализовать двухуровневый контур.</p>
+<!-- СХЕМА 2 -->
+<div style="border: 1px solid #dbe2ea; border-radius: 10px; background-color: #f8fafc; padding: 22px 20px; margin: 25px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+    <div style="text-align: center; margin-bottom: 18px;">
+        <div style="font-size: 18px; font-weight: bold; color: #0f2d59;">Факторы влияния Transparent Huge Pages на PostgreSQL</div>
+        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Почему механизм THP противопоказан транзакционным СУБД под нагрузкой 1С</div>
+    </div>
 
-    <p><strong>Рубеж 1. Параметры ядра в GRUB (<code>/etc/default/grub</code>):</strong></p>
-<pre><code>GRUB_CMDLINE_LINUX_DEFAULT="... transparent_hugepage=never"</code></pre>
-    <p>Применение: <code>sudo update-grub</code> или <code>sudo grub2-mkconfig -o /boot/grub2/grub.cfg</code>.</p>
+    <div style="border: 1px solid #fca5a5; border-radius: 8px; overflow: hidden; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="background-color: #991b1b; color: #ffffff; font-weight: bold; font-size: 13.5px; padding: 9px 16px; letter-spacing: 0.03em;">
+            ПОЧЕМУ THP УБИВАЕТ POSTGRESQL
+        </div>
+        <div style="padding: 12px;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width: 50%; padding: 6px; border: none; background: transparent; vertical-align: top;">
+                            <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px 14px;">
+                                <div style="font-weight: bold; color: #166534; font-size: 14px; margin-bottom: 5px;">1. Фрагментация (Memory Bloat)</div>
+                                <div style="font-size: 12.5px; color: #334155; line-height: 1.55;">
+                                    PostgreSQL оперирует блоками по 8&nbsp;КБ. Выделение 2&nbsp;МБ под 8&nbsp;КБ ведёт к колоссальному перерасходу оперативной памяти.
+                                </div>
+                            </div>
+                        </td>
+                        <td style="width: 50%; padding: 6px; border: none; background: transparent; vertical-align: top;">
+                            <div style="background-color: #fef2f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 12px 14px;">
+                                <div style="font-weight: bold; color: #991b1b; font-size: 14px; margin-bottom: 5px;">2. Compaction Latency Spikes</div>
+                                <div style="font-size: 12.5px; color: #334155; line-height: 1.55;">
+                                    При дефиците непрерывных 2&nbsp;МБ блоков демон <code>khugepaged</code> замирает и блокирует потоки СУБД для дефрагментации.
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    <p><strong>Рубеж 2. Гарантирующий systemd-юнит (<code>/etc/systemd/system/disable-thp.service</code>):</strong><br>
-    Юнит гарантирует отключение режимов <code>enabled</code> и <code>defrag</code> на этапе инициализации системы строго до запуска служб СУБД и 1С:</p>
-<pre><code>[Unit]
+    <div style="font-size: 13px; color: #64748b; font-style: italic; margin-top: 14px; text-align: center;">Схема 2. Причины деградации производительности СУБД при активном механизме THP</div>
+</div>
+
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">Инженерный стандарт SRE-Suite-for-1C-platform: двухуровневое отключение THP</h3>
+<p style="margin-bottom: 14px; font-size: 15px;">Простого выполнения команды <code>echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled</code> недостаточно&nbsp;— настройка сбросится сразу после перезагрузки хоста. Мы реализуем надёжный двухуровневый контур.</p>
+
+<p style="margin-bottom: 10px; font-size: 15px;"><strong>Рубеж 1. Фиксация в&nbsp;параметрах загрузчика GRUB (<code>/etc/default/grub</code>):</strong></p>
+
+<!-- БЛОК КОДА 2: GRUB -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Config &mdash; /etc/default/grub</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Kernel Boot Arguments</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">GRUB_CMDLINE_LINUX_DEFAULT="... transparent_hugepage=never"</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p style="margin-bottom: 14px; font-size: 14.5px;">Применение изменений: <code>sudo update-grub</code> или <code>sudo grub2-mkconfig -o /boot/grub2/grub.cfg</code>.</p>
+
+<p style="margin-bottom: 10px; font-size: 15px;"><strong>Рубеж 2. Гарантирующий systemd-юнит (<code>/etc/systemd/system/disable-thp.service</code>):</strong><br>
+Сервис отключает режимы <code>enabled</code> и&nbsp;<code>defrag</code> на&nbsp;раннем этапе инициализации ОС строго до&nbsp;старта СУБД и&nbsp;кластера 1С:</p>
+
+<!-- БЛОК КОДА 3: SYSTEMD THP -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Systemd Unit &mdash; /etc/systemd/system/disable-thp.service</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Early Boot Guard</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">[Unit]
 Description=Disable Transparent Huge Pages (THP) for 1C and PostgreSQL
 DefaultDependencies=no
 After=sysinit.target local-fs.target
@@ -284,20 +343,74 @@ Type=oneshot
 ExecStart=/bin/sh -c 'echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled &amp;&amp; echo never &gt; /sys/kernel/mm/transparent_hugepage/defrag'
 
 [Install]
-WantedBy=basic.target</code></pre>
-    <p>Активация сервиса:</p>
-<pre><code>sudo systemctl daemon-reload
-sudo systemctl enable --now disable-thp.service</code></pre>
+WantedBy=basic.target</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <hr>
+<!-- БЛОК КОДА 4: BASH АКТИВАЦИЯ -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Bash &mdash; Активация службы</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">CLI</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">sudo systemctl daemon-reload
+sudo systemctl enable --now disable-thp.service</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <h2>Раздел 3. Сетевой стек ядра Linux и дескрипторы</h2>
-    <p>В <a href="https://infostart.ru/1c/articles/2783161/">четвёртой части нашего цикла</a> мы настроили отказоустойчивый кластер Patroni и внедрили параметр <code>net.ipv4.ip_nonlocal_bind = 1</code> для бесшовного поднятия виртуального IP демоном <code>vip-manager</code>. Дополним конфигурацию настройками, защищающими от шторма входящих TCP-соединений.</p>
+<!-- РАЗДЕЛ 4 -->
+<h2 id="section-4" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">⚙ Сетевой стек ядра и&nbsp;дескрипторы:</span> <span style="color: #0066cc; font-weight: bold;">защита от&nbsp;шторма подключений и&nbsp;лимиты systemd</span></h2>
 
-    <h3>3.1. Защита от потерь подключений при утреннем логине пользователей</h3>
-    <p>В моменты пиковой нагрузки (массовый вход пользователей в систему в 8:30 утра или синхронный запуск регламентных заданий) сервер приложений 1С одномоментно генерирует тысячи TCP-подключений к СУБД. При стандартном значении очереди прослушивания в 128 сокетов ядро начинает отбрасывать входящие пакеты SYN. Пользователи получают ошибки сетевого тайм-аута.</p>
-    <p>Параметры сетевого стека для высоконагруженных очередей:</p>
-<pre><code># Разрешение связывания с непривязанным VIP (требование vip-manager из Части 4)
+<p style="margin-bottom: 14px; font-size: 15px;">В&nbsp;<a href="https://infostart.ru/1c/articles/2783161/" style="color: #0066cc; text-decoration: none;">четвёртой части цикла</a> мы настроили кластер Patroni и&nbsp;активировали параметр <code>net.ipv4.ip_nonlocal_bind = 1</code> для&nbsp;бесшовного переключения виртуального IP через <code>vip-manager</code>. Дополним сетевую конфигурацию защитой от&nbsp;лавины входящих TCP-сессий.</p>
+
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">4.1. Защита от&nbsp;потерь подключений при массовом входе пользователей</h3>
+<p style="margin-bottom: 14px; font-size: 15px;">В&nbsp;моменты утреннего пикового логина или синхронного запуска регламентных фоновых задач сервер приложений 1С одномоментно генерирует сотни и&nbsp;тысячи сетевых сокетов к&nbsp;базе. При стандартном значении очереди <code>somaxconn = 128</code> ядро начинает отбрасывать входящие пакеты SYN. Пользователи получают сообщения об&nbsp;обрыве сетевого соединения.</p>
+
+<!-- БЛОК КОДА 5: NETWORK SYSCTL -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Sysctl &mdash; Сетевые параметры для высоконагруженного стека</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">TCP Tuning</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;"># Разрешение связывания с непривязанным VIP (требование vip-manager из Части 4)
 net.ipv4.ip_nonlocal_bind = 1
 
 # Длина очереди слушающих сокетов ядра (вместо дефолтных 128)
@@ -306,19 +419,48 @@ net.core.somaxconn = 4096
 # Размер очереди полуоткрытых SYN-подключений
 net.ipv4.tcp_max_syn_backlog = 4096
 
-# Безопасное повторное использование сокетов в состоянии TIME_WAIT для исходящих TCP-сессий
+# Повторное использование сокетов в состоянии TIME_WAIT для исходящих сессий
 net.ipv4.tcp_tw_reuse = 1
 
 # Время удержания сокета в состоянии FIN-WAIT-2
-net.ipv4.tcp_fin_timeout = 15</code></pre>
+net.ipv4.tcp_fin_timeout = 15</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <h3>3.2. Системные лимиты дескрипторов (PAM vs systemd)</h3>
-    <p>Каждый клиентский сеанс 1С, рабочий процесс <code>rphost</code> и фоновый процесс СУБД удерживают десятки открытых сокетов и файлов. Стандартный лимит ОС в 1024 дескриптора приводит к падениям с ошибкой <code>Too many open files</code>.</p>
-    <p><strong>Внимание, подводный камень:</strong> Настройки в <code>/etc/security/limits.d/</code> действуют <strong>только для интерактивных сессий PAM</strong> (SSH, локальный вход). Сервисы, запущенные через <code>systemd</code>, полностью игнорируют этот файл!</p>
-    <p>Поэтому мы настраиваем оба контура:</p>
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">4.2. Системные лимиты дескрипторов (PAM против systemd)</h3>
+<p style="margin-bottom: 14px; font-size: 15px;">Каждый клиентский сеанс 1С, процесс <code>rphost</code> и&nbsp;бэкенд СУБД удерживают десятки открытых сокетов и&nbsp;файловых хэндлов. Дефолтный лимит ОС в&nbsp;1024 дескриптора приводит к&nbsp;аварийным падениям с&nbsp;ошибкой <code>Too many open files</code>.</p>
 
-    <p>1. Конфигурация для интерактивного доступа <code>/etc/security/limits.d/99-1c-postgres.conf</code>:</p>
-<pre><code>postgres    soft    nofile    65536
+<p style="margin-bottom: 14px; font-size: 15px;"><strong>Критическая деталь:</strong> Настройки в&nbsp;файле <code>/etc/security/limits.d/</code> действуют <strong>исключительно для&nbsp;интерактивных сессий PAM</strong> (SSH, локальная консоль). Фоновые демоны, управляемые через <code>systemd</code>, данные файлы игнорируют. Требуется раздельная конфигурация обоих контуров:</p>
+
+<p style="margin-bottom: 10px; font-size: 15px;">1. Конфигурация для&nbsp;интерактивного входа <code>/etc/security/limits.d/99-1c-postgres.conf</code>:</p>
+
+<!-- БЛОК КОДА 6: PAM LIMITS -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Config &mdash; /etc/security/limits.d/99-1c-postgres.conf</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">PAM Sessions</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5
+6
+7
+8
+9</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">postgres    soft    nofile    65536
 postgres    hard    nofile    65536
 postgres    soft    nproc     65536
 postgres    hard    nproc     65536
@@ -326,22 +468,88 @@ postgres    hard    nproc     65536
 usr1cv8     soft    nofile    65536
 usr1cv8     hard    nofile    65536
 usr1cv8     soft    nproc     65536
-usr1cv8     hard    nproc     65536</code></pre>
+usr1cv8     hard    nproc     65536</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <p>2. Декларативные Drop-in оверрайды для systemd-служб (<code>/etc/systemd/system/patroni.service.d/override.conf</code> и <code>/etc/systemd/system/srv1cv8-8.3.XX.service.d/override.conf</code>):</p>
-<pre><code>[Service]
+<p style="margin-bottom: 10px; font-size: 15px;">2. Декларативные Drop-in оверрайды для&nbsp;systemd-служб (<code>/etc/systemd/system/patroni.service.d/override.conf</code> и&nbsp;<code>/etc/systemd/system/srv1cv8-8.3.*.service.d/override.conf</code>):</p>
+
+<!-- БЛОК КОДА 7: SYSTEMD OVERRIDE -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Systemd Override &mdash; override.conf</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Systemd Drop-in</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">[Service]
 LimitNOFILE=65536
 LimitNPROC=65536
-LimitMEMLOCK=infinity</code></pre>
+LimitMEMLOCK=infinity</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <hr>
+<!-- РАЗДЕЛ 5 -->
+<h2 id="section-5" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🎯 Автоматизация через IaC:</span> <span style="color: #0066cc; font-weight: bold;">декларативная Ansible-роль linux_tuning</span></h2>
 
-    <h2>Раздел 4. Декларативная Ansible-роль <code>ansible-role-linux-tuning</code></h2>
-    <p>Чтобы исключить дрейф конфигураций на серверах продуктивного кластера, мы упаковали все рассмотренные инженерные правила в готовую Ansible-роль в составе нашего репозитория <a href="https://github.com/NickScherbakov/1c-sre-suite"><strong>NickScherbakov/1c-sre-suite</strong></a>.</p>
+<p style="margin-bottom: 14px; font-size: 15px;">Чтобы исключить дрейф конфигураций на&nbsp;серверах продуктивного кластера, мы объединили все проверенные настройки в&nbsp;готовую Ansible-роль в&nbsp;составе открытого репозитория <a href="https://github.com/NickScherbakov/1c-sre-suite" style="color: #0066cc; text-decoration: none; font-weight: bold;" target="_blank">NickScherbakov/1c-sre-suite</a>.</p>
 
-    <h3>Шаблон параметров ядра: <code>/etc/sysctl.d/99-1c-postgresql.conf</code></h3>
-<pre><code># ====================================================================
-# 1C:SRE-Suite — Production Kernel Tuning for PostgreSQL &amp; 1C
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">Шаблон параметров ядра: <code>ansible/roles/linux_tuning/templates/99-1c-postgresql.conf.j2</code></h3>
+
+<!-- БЛОК КОДА 8: JINJA SYSCTL -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Jinja2 / Sysctl &mdash; 99-1c-postgresql.conf.j2</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Production Kernel Config</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;"># ====================================================================
+# SRE-Suite-for-1C-platform — Production Kernel Tuning for PostgreSQL &amp; 1C
 # Repository: NickScherbakov/1c-sre-suite (MIT License)
 # ====================================================================
 
@@ -361,10 +569,78 @@ net.ipv4.tcp_fin_timeout = 15
 
 # --- IPC Semaphores &amp; File Descriptors ---
 kernel.sem = 5010 641280 5010 128
-fs.file-max = 2097152</code></pre>
+fs.file-max = 2097152</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <h3>Задачи плейбука: <code>ansible/roles/linux_tuning/tasks/main.yml</code></h3>
-<pre><code>---
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">Задачи плейбука: <code>ansible/roles/linux_tuning/tasks/main.yml</code></h3>
+
+<!-- БЛОК КОДА 9: ANSIBLE TASKS -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>YAML &mdash; ansible/roles/linux_tuning/tasks/main.yml</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Ansible Automation</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">---
 - name: Apply sysctl configuration for 1C &amp; PostgreSQL
   ansible.builtin.template:
     src: 99-1c-postgresql.conf.j2
@@ -411,21 +687,94 @@ fs.file-max = 2097152</code></pre>
       LimitNPROC=65536
     dest: /etc/systemd/system/patroni.service.d/override.conf
     mode: '0644'
-  notify: Reload systemd</code></pre>
+  notify: Reload systemd</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <hr>
+<!-- РАЗДЕЛ 6 -->
+<h2 id="section-6" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🛠 Экспресс-диагностика инфраструктуры:</span> <span style="color: #0066cc; font-weight: bold;">утилита аудита sre-1c-pg-healthcheck.sh</span></h2>
 
-    <h2>Раздел 5. Инструмент экспресс-диагностики: скрипт <code>sre-1c-pg-healthcheck.sh</code></h2>
-    <p>Для моментального скрининга серверов мы создали утилиту <strong><code>sre-1c-pg-healthcheck.sh</code></strong>.</p>
-    <p>Это автономный Bash-скрипт без сторонних зависимостей (не требует даже <code>bc</code>), который за несколько секунд выполняет комплексный аудит по триаде: <strong>«Ядро Linux и виртуальная память ↔ Patroni и СУБД ↔ Кластер серверов 1С»</strong>.</p>
+<p style="margin-bottom: 14px; font-size: 15px;">Для&nbsp;оперативного выявления деградаций и&nbsp;дрейфа конфигураций на&nbsp;боевых серверах мы разработали легковесный инструмент <strong><code>sre-1c-pg-healthcheck.sh</code></strong>.</p>
+<p style="margin-bottom: 14px; font-size: 15px;">Скрипт полностью автономен, не&nbsp;требует установки внешних пакетов (работает даже без <code>bc</code>) и&nbsp;за&nbsp;считанные секунды собирает фактуру по&nbsp;ключевой триаде: <strong>«Ядро Linux и&nbsp;виртуальная память &harr; Кластер Patroni и&nbsp;СУБД &harr; Рабочие процессы rphost»</strong>.</p>
 
-    <h3>Запуск диагностики на сервере:</h3>
-<pre><code>chmod +x sre-1c-pg-healthcheck.sh
-./sre-1c-pg-healthcheck.sh</code></pre>
+<p style="margin-bottom: 10px; font-size: 15px;">Запуск скрипта на&nbsp;ноде:</p>
 
-    <h3>Реальный терминальный вывод утилиты:</h3>
-<pre><code>================================================================================
- 1C:SRE-Suite — System &amp; Database Health Check (v1.1)
+<!-- БЛОК КОДА 10: BASH HEALTHCHECK RUN -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Bash &mdash; Запуск проверки</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">CLI</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">chmod +x sre-1c-pg-healthcheck.sh
+./sre-1c-pg-healthcheck.sh</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p style="margin-bottom: 10px; font-size: 15px;">Реальный терминальный вывод утилиты в&nbsp;продуктивном контуре:</p>
+
+<!-- БЛОК КОДА 11: HEALTHCHECK OUTPUT -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Terminal Output &mdash; sre-1c-pg-healthcheck.sh</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Audit Results</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10pt; line-height: 1.45; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">================================================================================
+ SRE-Suite-for-1C-platform — System &amp; Database Health Check (v1.1)
  Host: node1-pg16.prod.local | Kernel: 5.15.0-101-generic | Date: 2026-09-14 16:30:00
 ================================================================================
 
@@ -454,57 +803,144 @@ fs.file-max = 2097152</code></pre>
 ================================================================================
  SUMMARY: 7 OK | 3 WARNINGS | 0 FAILURES
  Tip: Run './sre-1c-pg-healthcheck.sh --generate-fix' to generate an automated remediation script.
-================================================================================</code></pre>
+================================================================================</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <h3>Генерация авто-исправления (<code>--generate-fix</code>):</h3>
-    <p>При передаче флага <code>--generate-fix</code> утилита создаёт исполняемый сценарий <code>/tmp/sre-healthcheck-fix.sh</code>, включающий точечные команды <code>sysctl -w ...</code> и отключение THP на лету. Инженер может применить рекомендованные настройки без ручного ввода команд:</p>
-<pre><code>sudo bash /tmp/sre-healthcheck-fix.sh</code></pre>
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">Режим генерации сценария исправления (<code>--generate-fix</code>)</h3>
+<p style="margin-bottom: 14px; font-size: 15px;">При передаче флага <code>--generate-fix</code> утилита формирует готовый к&nbsp;применению скрипт <code>/tmp/sre-healthcheck-fix.sh</code>, содержащий точечные вызовы <code>sysctl -w ...</code> и&nbsp;команды отключения THP на&nbsp;лету. Это позволяет инженеру устранить узкие места без ручного перепечатывания параметров:</p>
 
-    <hr>
+<!-- БЛОК КОДА 12: FIX SCRIPT RUN -->
+<div style="background-color: #f8fafc; border: 1px solid #dcdfe6; border-radius: 6px; margin: 16px 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+  <div style="background-color: #e6eaf0; color: #1e3a8a; font-size: 11pt; font-weight: 600; padding: 7px 14px; border-bottom: 1px solid #dcdfe6; display: flex; justify-content: space-between; align-items: center;">
+    <span>Bash &mdash; Применение сформированного фикса</span>
+    <span style="color: #718096; font-weight: normal; font-size: 9pt;">Remediation</span>
+  </div>
+  <div style="overflow-x: auto; padding: 12px 16px; background-color: #f8fafc;">
+    <table style="border-collapse: collapse; width: 100%; border: none; margin: 0; background: transparent;">
+      <tbody>
+        <tr>
+          <td style="vertical-align: top; width: 28px; min-width: 28px; padding: 0 16px 0 0; border: none; background: transparent; text-align: right; user-select: none;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #94a3b8; background: transparent; border: none; padding: 0; text-align: right;">1</pre>
+          </td>
+          <td style="vertical-align: top; padding: 0; border: none; background: transparent; width: 100%;">
+            <pre style="margin: 0; font-family: Consolas, 'JetBrains Mono', monospace; font-size: 10.5pt; line-height: 1.5; color: #0a2540; background: transparent; border: none; padding: 0; overflow-x: auto; white-space: pre;">sudo bash /tmp/sre-healthcheck-fix.sh</pre>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    <h2>Итоги 5 частей и обновленный Roadmap проекта 1C:SRE-Suite</h2>
-    <p>За 5 практических выпусков открытого цикла мы построили сквозной фундамент отказоустойчивости корпоративного контура «1С:Предприятие 8.3» на Linux:</p>
+<!-- РАЗДЕЛ 7 -->
+<h2 id="section-7" style="font-size: 19px; line-height: 1.4; margin-top: 35px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px;"><span style="color: #111827; font-weight: bold;">🤝 Итоги первого этапа и&nbsp;Roadmap:</span> <span style="color: #0066cc; font-weight: bold;">что ждёт читателей в&nbsp;следующих выпусках</span></h2>
 
-    <!-- СХЕМА 3: ИНЛАЙН SVG (Отображается гарантированно, без сбоев) -->
-    <figure class="diagram-figure">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 290" width="100%" height="auto" style="max-width: 720px; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);">
-          <style>
-            .th3 { font-family: system-ui, -apple-system, sans-serif; font-size: 14px; font-weight: 700; fill: #38bdf8; text-anchor: middle; letter-spacing: 0.05em; }
-            .tag3 { font-family: monospace; font-size: 13px; font-weight: 700; }
-            .desc3 { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; fill: #f1f5f9; }
-          </style>
-          <rect width="720" height="290" rx="10" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5"/>
-          <rect width="720" height="38" rx="8" fill="#1e293b"/>
-          <text x="360" y="24" class="th3">СКВОЗНОЙ СТЕК 1C:SRE-SUITE ДЛЯ LINUX</text>
-          <rect x="25" y="50" width="670" height="42" rx="6" fill="#0f172a" stroke="#3b82f6"/>
-          <text x="40" y="76" class="tag3" fill="#60a5fa">[CI/CD]</text>
-          <text x="110" y="76" class="desc3">GitHub Actions / 5 Рубежей Защиты / EDT Bridge (Части 1-2)</text>
-          <path d="M 360 92 L 360 106" stroke="#475569" stroke-width="2"/>
-          <polygon points="356,106 364,106 360,111" fill="#475569"/>
-          <rect x="25" y="111" width="670" height="42" rx="6" fill="#0f172a" stroke="#10b981"/>
-          <text x="40" y="137" class="tag3" fill="#34d399">[SECURITY]</text>
-          <text x="135" y="137" class="desc3">Потоковое маскирование pg_anon + BSL Post-Process (Часть 3)</text>
-          <path d="M 360 153 L 360 167" stroke="#475569" stroke-width="2"/>
-          <polygon points="356,167 364,167 360,172" fill="#475569"/>
-          <rect x="25" y="172" width="670" height="42" rx="6" fill="#0f172a" stroke="#f59e0b"/>
-          <text x="40" y="198" class="tag3" fill="#fbbf24">[DATABASE HA]</text>
-          <text x="165" y="198" class="desc3">Patroni + etcd + vip-manager (Zero Proxy Overheads) (Часть 4)</text>
-          <path d="M 360 214 L 360 228" stroke="#475569" stroke-width="2"/>
-          <polygon points="356,228 364,228 360,233" fill="#475569"/>
-          <rect x="25" y="233" width="670" height="42" rx="6" fill="#0f172a" stroke="#a855f7"/>
-          <text x="40" y="259" class="tag3" fill="#c084fc">[OS TUNING]</text>
-          <text x="150" y="259" class="desc3">Virtual Memory Tuning + THP Off + sre-healthcheck (Часть 5)</text>
-        </svg>
-        <figcaption class="diagram-caption">Схема 3. Архитектура сквозного стека отказоустойчивости 1C:SRE-Suite</figcaption>
-    </figure>
+<p style="margin-bottom: 14px; font-size: 15px;">За&nbsp;5 практических выпусков открытого цикла мы построили сквозной фундамент отказоустойчивости корпоративного контура «1С:Предприятие 8.3» на&nbsp;Linux:</p>
 
-    <h3>Что ждёт читателей в следующих выпусках (Roadmap):</h3>
-    <ol>
-        <li><strong>Резервное копирование и Disaster Recovery (Часть 6):</strong> Настройка <code>pg_probackup</code> с валидацией инкрементальных копий, физической репликацией и выгрузкой сжатых резервных копий в S3-совместимые хранилища.</li>
-        <li><strong>Headless-автотесты в CI/CD (Часть 7):</strong> Развёртывание сценарных BDD-тестов Vanessa-Automation и модульных проверок YAxUnit внутри легковесных Docker-контейнеров сразу после синтаксического гейта.</li>
-        <li><strong>AIOps и автономные ИИ-агенты на базе Model Context Protocol (Часть 8):</strong> Запуск ИИ-дежурного (AI On-Call), который анализирует аномалии технологического журнала, сопоставляет утечки <code>rphost</code> со строками BSL-кода и автоматически формирует Pull Request'ы с исправлениями.</li>
-    </ol>
-    <p>Все конфигурационные файлы, Ansible-роли и диагностический скрипт опубликованы в открытом репозитории <a href="https://github.com/NickScherbakov/1c-sre-suite"><strong>NickScherbakov/1c-sre-suite</strong></a> под свободной лицензией MIT[cite: 7]. Тестируйте на своих контурах, открывайте Issue и присылайте Pull Request'ы!</p>
+<!-- СХЕМА 3 (ЧИСТАЯ HTML/CSS ВЁРСТКА ROADMAP) -->
+<div style="border: 1px solid #dbe2ea; border-radius: 10px; background-color: #f8fafc; padding: 22px 20px; margin: 25px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <div style="font-size: 20px; font-weight: bold; color: #0f2d59;">Сквозной стек SRE-Suite-for-1C-platform</div>
+        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Архитектурные слои контура надёжности (Части 1&ndash;5)</div>
+    </div>
+
+    <!-- Этап I -->
+    <div style="border: 1px solid #bfdbfe; border-radius: 8px; overflow: hidden; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="background-color: #1e56a0; color: #ffffff; font-weight: bold; font-size: 13.5px; padding: 9px 16px;">
+            Этап I. Контур сборки и непрерывной интеграции (CI/CD)
+        </div>
+        <div style="padding: 12px 16px;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width: 90px; font-weight: bold; color: #1e40af; font-size: 13px; padding: 4px 0; border: none; background: transparent; vertical-align: top;">Часть 1.</td>
+                        <td style="font-size: 13px; color: #334155; padding: 4px 0; border: none; background: transparent;">Сборочная линия на Linux: 5 рубежей обороны и ротация процессов rphost</td>
+                    </tr>
+                    <tr>
+                        <td style="width: 90px; font-weight: bold; color: #1e40af; font-size: 13px; padding: 4px 0; border: none; background: transparent; vertical-align: top;">Часть 2.</td>
+                        <td style="font-size: 13px; color: #334155; padding: 4px 0; border: none; background: transparent;">Детерминированный CI/CD в GitHub Actions: сетевые HASP-ключи и RUN_ID</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Стрелка перехода вниз -->
+    <div style="text-align: center; margin: 10px 0;">
+        <div style="width: 4px; height: 16px; background-color: #2563eb; margin: 0 auto;"></div>
+        <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid #2563eb; margin: 0 auto;"></div>
+    </div>
+
+    <!-- Этап II -->
+    <div style="border: 1px solid #bbf7d0; border-radius: 8px; overflow: hidden; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="background-color: #166534; color: #ffffff; font-weight: bold; font-size: 13.5px; padding: 9px 16px;">
+            Этап II. Безопасность данных и СУБД High-Availability
+        </div>
+        <div style="padding: 12px 16px;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width: 90px; font-weight: bold; color: #15803d; font-size: 13px; padding: 4px 0; border: none; background: transparent; vertical-align: top;">Часть 3.</td>
+                        <td style="font-size: 13px; color: #334155; padding: 4px 0; border: none; background: transparent;">Контур Dev/Test без утечек ПДн: потоковое маскирование pg_anon и BSL</td>
+                    </tr>
+                    <tr>
+                        <td style="width: 90px; font-weight: bold; color: #15803d; font-size: 13px; padding: 4px 0; border: none; background: transparent; vertical-align: top;">Часть 4.</td>
+                        <td style="font-size: 13px; color: #334155; padding: 4px 0; border: none; background: transparent;">Отказоустойчивый кластер PostgreSQL под Patroni и etcd без оверхеда HAProxy</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Стрелка перехода вниз -->
+    <div style="text-align: center; margin: 10px 0;">
+        <div style="width: 4px; height: 16px; background-color: #2563eb; margin: 0 auto;"></div>
+        <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid #2563eb; margin: 0 auto;"></div>
+    </div>
+
+    <!-- Этап III -->
+    <div style="border: 1px solid #fed7aa; border-radius: 8px; overflow: hidden; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="background-color: #c2410c; color: #ffffff; font-weight: bold; font-size: 13.5px; padding: 9px 16px;">
+            Этап III. Тюнинг ядра ОС Linux и экспресс-диагностика
+        </div>
+        <div style="padding: 12px 16px;">
+            <table style="width: 100%; border-collapse: collapse; border: none; margin: 0; background: transparent;">
+                <tbody>
+                    <tr>
+                        <td style="width: 90px; font-weight: bold; color: #ea580c; font-size: 13px; padding: 4px 0; border: none; background: transparent; vertical-align: top;">Часть 5.</td>
+                        <td style="font-size: 13px; color: #334155; padding: 4px 0; border: none; background: transparent;">Тюнинг виртуальной памяти, dirty_bytes, отключение THP и утилита healthcheck</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="font-size: 13px; color: #64748b; font-style: italic; margin-top: 14px; text-align: center;">Схема 3. Архитектура сквозного стека отказоустойчивости SRE-Suite-for-1C-platform</div>
+</div>
+
+<h3 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-top: 24px; margin-bottom: 10px;">Планы развития проекта (Roadmap):</h3>
+<ol style="padding-left: 22px; margin-bottom: 18px; font-size: 14.5px; line-height: 1.75;">
+    <li><strong>Резервное копирование и&nbsp;Disaster Recovery (Часть 6):</strong> Развёртывание <code>pg_probackup</code> с&nbsp;валидацией инкрементальных копий, физической потоковой репликацией и&nbsp;выгрузкой сжатых резервных копий в&nbsp;S3-совместимые объектные хранилища.</li>
+    <li><strong>Headless-автотесты в&nbsp;CI/CD (Часть 7):</strong> Запуск сценарных BDD-тестов Vanessa-Automation и&nbsp;модульных проверок YAxUnit внутри легковесных Docker-контейнеров непосредственно после синтаксического гейта.</li>
+    <li><strong>AIOps и&nbsp;автономные ИИ-агенты на&nbsp;базе Model Context Protocol (Часть 8):</strong> Запуск дежурного ИИ-агента (AI On-Call), который анализирует аномалии технологического журнала, связывает утечки <code>rphost</code> со&nbsp;строками BSL-кода и&nbsp;автоматически формирует Pull Request'ы с&nbsp;исправлениями.</li>
+</ol>
+
+<p style="margin-bottom: 14px; font-size: 15px;">Все конфигурационные файлы, Ansible-роли и&nbsp;диагностический скрипт опубликованы в&nbsp;открытом репозитории <a href="https://github.com/NickScherbakov/1c-sre-suite" style="color: #0066cc; text-decoration: none; font-weight: bold;" target="_blank">NickScherbakov/1c-sre-suite</a> под&nbsp;свободной лицензией MIT. Разворачивайте на&nbsp;своих стендах, открывайте Issue и&nbsp;присылайте Pull Request'ы!</p>
+
+<!-- 6. РАЗДЕЛ «ПРЕДЫДУЩИЕ МАТЕРИАЛЫ ЦИКЛА» (ВСЕГДА ПОСЛЕДНИЙ, #section-8) -->
+<div id="section-8" style="margin-top: 40px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+    <p style="font-style: italic; color: #4b5563; font-size: 14.5px; margin-bottom: 12px;">Если вы хотите подробнее ознакомиться с&nbsp;другими архитектурными решениями нашего проекта, рекомендуем прочитать наши предыдущие материалы:</p>
+    <ul style="line-height: 1.85; font-size: 14.5px; padding-left: 22px; margin: 0;">
+        <li><a href="https://infostart.ru/1c/articles/2779597/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank"><strong>Часть 1:</strong> SRE-Suite-for-1C-platform — Архитектура надёжности и&nbsp;CI/CD сборочной линии на&nbsp;Linux: 5 рубежей обороны и&nbsp;ротация rphost</a></li>
+        <li><a href="https://infostart.ru/1c/articles/2780378/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank"><strong>Часть 2:</strong> SRE-Suite-for-1C-platform — Детерминированный CI/CD в&nbsp;GitHub Actions: сетевые HASP-ключи в&nbsp;Docker и&nbsp;динамический RUN_ID</a></li>
+        <li><a href="https://infostart.ru/1c/articles/2781587/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank"><strong>Часть 3:</strong> SRE-Suite-for-1C-platform — Безопасный контур Dev/Test без&nbsp;утечек ПДн: потоковое маскирование pg_anon и&nbsp;пост-обработка в&nbsp;1C:BSL</a></li>
+        <li><a href="https://infostart.ru/1c/articles/2783161/" rel="noopener noreferrer" style="color: #0066cc; text-decoration: none;" target="_blank"><strong>Часть 4:</strong> SRE-Suite-for-1C-platform — Отказоустойчивый кластер PostgreSQL под&nbsp;Patroni и&nbsp;etcd без&nbsp;оверхеда HAProxy через vip-manager</a></li>
+    </ul>
+</div>
 
 </body>
 </html>
