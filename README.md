@@ -79,4 +79,4 @@ chmod +x scripts/sre-1c-pg-healthcheck.sh
 ```
 
 ---
-Разработано совместно в рамках проекта «1С:SRE-Контур». Свободная лицензия MIT.
+Разработано для публикации на infostart.ru в рамках проекта «SRE-suite-for-1C-platform». Свободная лицензия MIT.
