@@ -71,5 +71,12 @@ ansible-vault encrypt group_vars/db_nodes/vault.yml
 ansible-playbook -i hosts.ini deploy-cluster.yml --ask-vault-pass
 ```
 
+### 5. Тюнинг ядра Linux и экспресс-диагностика PostgreSQL + 1С
+Подробный разбор параметров `sysctl`, отключения THP и практик снижения I/O-ступоров — в [пятой части цикла](https://infostart.ru/1c/articles/2790159/). Для быстрой проверки состояния Linux, PostgreSQL и кластера 1С используйте встроенный диагностический скрипт:
+```bash
+chmod +x scripts/sre-1c-pg-healthcheck.sh
+./scripts/sre-1c-pg-healthcheck.sh
+```
+
 ---
 Разработано совместно в рамках проекта «1С:SRE-Контур». Свободная лицензия MIT.
